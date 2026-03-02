@@ -1,0 +1,202 @@
+// ──── Auth ────
+export interface LoginRequest {
+  email?: string;
+  phone?: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email?: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  password: string;
+  role: "shipper" | "carrier";
+}
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+}
+
+export interface RegisterResponse extends AuthTokens {
+  role: string;
+}
+
+// ──── User ────
+export interface User {
+  id: string;
+  email: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  status: string;
+  created_at: string;
+}
+
+export interface UpdateUserRequest {
+  first_name?: string;
+  last_name?: string;
+}
+
+// ──── Company ────
+export interface Company {
+  id: string;
+  name: string;
+  owner_id: string;
+  role: string;
+  status: string;
+  created_at: string;
+}
+
+export interface CreateCompanyRequest {
+  name: string;
+}
+
+export interface CreateCompanyResponse {
+  id: string;
+  name: string;
+}
+
+export interface UpdateCompanyRequest {
+  name: string;
+}
+
+// ──── Members ────
+export interface Member {
+  member_id: string;
+  company_id: string;
+  alias: string;
+  role: string;
+  created_at: string;
+}
+
+export interface AddMemberRequest {
+  user_id: string;
+  alias: string;
+  role: "admin" | "member";
+}
+
+// ──── Carriers ────
+export interface Carrier {
+  carrier_id: string;
+  first_name: string;
+  last_name: string;
+  alias: string;
+  created_at: string;
+}
+
+export interface AddCarrierRequest {
+  carrier_id: string;
+  alias: string;
+}
+
+export interface CarrierSearchResult {
+  id: string;
+  email: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ──── Loads ────
+export type LoadStatus =
+  | "created"
+  | "assigned"
+  | "accepted"
+  | "in_transit"
+  | "completed"
+  | "confirmed"
+  | "cancelled";
+
+export interface Load {
+  id: string;
+  title: string;
+  description: string;
+  reference_id: string;
+  company_id: string;
+  member_id: string;
+  carrier_id: string;
+  status: LoadStatus;
+  pickup_address: string;
+  pickup_lat: number;
+  pickup_lng: number;
+  pickup_at: string;
+  dropoff_address: string;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  dropoff_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateLoadRequest {
+  company_id: string;
+  title: string;
+  description?: string;
+  pickup_address?: string;
+  pickup_lat: number;
+  pickup_lng: number;
+  dropoff_address?: string;
+  dropoff_lat: number;
+  dropoff_lng: number;
+}
+
+export interface CreateLoadResponse {
+  id: string;
+  status: string;
+}
+
+export interface AssignLoadRequest {
+  carrier_id: string;
+}
+
+// ──── Tracking ────
+export interface Position {
+  load_id: string;
+  carrier_id: string;
+  lat: number;
+  lng: number;
+  speed_mps: number;
+  heading_deg: number;
+  accuracy_m: number;
+  recorded_at: string;
+}
+
+export interface TrackPoint {
+  lat: number;
+  lng: number;
+  speed_mps: number;
+  heading_deg: number;
+  accuracy_m: number;
+  recorded_at: string;
+}
+
+export interface TrackResponse {
+  load_id: string;
+  points: TrackPoint[];
+  total: number;
+}
+
+// ──── Pagination ────
+export interface PaginationParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface PaginatedResponse<T> {
+  result: T[];
+  limit: number;
+  offset: number;
+  count: number;
+}
+
+export interface LoadListParams extends PaginationParams {
+  company_id?: string;
+  carrier_id?: string;
+  status?: string;
+}
