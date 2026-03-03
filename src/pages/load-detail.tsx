@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
@@ -36,11 +38,12 @@ import {
   CheckCircle2,
   XCircle,
   UserPlus,
+  Radio,
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Load, Carrier, Position } from "@/types";
+import type { Load, Carrier, Position, TrackPoint, TrackResponse, PaginatedResponse } from "@/types";
 
 // Fix Leaflet icons
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -80,12 +83,24 @@ const carrierIcon = new L.Icon({
   className: "hue-rotate-[200deg]", // blue
 });
 
+// Auto-center map when carrier position changes
+function MapFlyTo({ position }: { position: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, map.getZoom(), { duration: 1.5 });
+    }
+  }, [position, map]);
+  return null;
+}
+
 export default function LoadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { selectedCompanyId } = useCompanyStore();
   const [load, setLoad] = useState<Load | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
+  const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -96,6 +111,19 @@ export default function LoadDetailPage() {
   const [selectedCarrierId, setSelectedCarrierId] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+
+  // WebSocket real-time tracking
+  const isTrackable = load && ["assigned", "accepted", "in_transit"].includes(load.status);
+  const { isConnected, lastPosition } = useLoadPositionWS({
+    loadId: id,
+    enabled: !!isTrackable,
+    onPosition: (pos) => setPosition(pos),
+  });
+
+  // Update position from WS
+  useEffect(() => {
+    if (lastPosition) setPosition(lastPosition);
+  }, [lastPosition]);
 
   const fetchLoad = useCallback(async () => {
     if (!id) return;
@@ -110,8 +138,16 @@ export default function LoadDetailPage() {
           const posRes = await api.get<Position>(`/loads/${id}/position`);
           setPosition(posRes.data);
         } catch {
-          // No position yet, that's fine
+          // No position yet
         }
+      }
+
+      // Fetch track history
+      try {
+        const trackRes = await api.get<TrackResponse>(`/loads/${id}/track`);
+        setTrackPoints(trackRes.data?.points ?? []);
+      } catch {
+        // No track yet
       }
     } catch (err) {
       setError(getApiErrorMessage(err));
@@ -128,8 +164,8 @@ export default function LoadDetailPage() {
     if (!selectedCompanyId) return;
     setCarriersLoading(true);
     try {
-      const { data } = await api.get<Carrier[]>(`/companies/${selectedCompanyId}/carriers`);
-      setCarriers(data ?? []);
+      const { data } = await api.get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`);
+      setCarriers(Array.isArray(data) ? data : (data?.result ?? []));
     } catch {
       setCarriers([]);
     } finally {
@@ -227,6 +263,12 @@ export default function LoadDetailPage() {
               {load.reference_id && (
                 <code className="text-xs text-muted-foreground">#{load.reference_id}</code>
               )}
+              {isTrackable && (
+                <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
+                  <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
+                  {isConnected ? "Live" : "Offline"}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -291,32 +333,46 @@ export default function LoadDetailPage() {
       {/* Map */}
       <Card>
         <CardContent className="p-0 overflow-hidden rounded-xl">
-          <div className="h-[350px]">
+          <div className="h-[400px]">
             <MapContainer center={mapCenter} zoom={12} className="h-full w-full rounded-xl">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+              {/* Auto-center on carrier position */}
+              <MapFlyTo position={position ? [position.lat, position.lng] : null} />
+              {/* Pickup marker (green) */}
               {load.pickup_lat && load.pickup_lng && (
                 <Marker position={[load.pickup_lat, load.pickup_lng]} icon={pickupIcon} />
               )}
+              {/* Dropoff marker (red) */}
               {load.dropoff_lat && load.dropoff_lng && (
                 <Marker position={[load.dropoff_lat, load.dropoff_lng]} icon={dropoffIcon} />
               )}
+              {/* Carrier marker (blue, live) */}
               {position && (
                 <Marker position={[position.lat, position.lng]} icon={carrierIcon} />
               )}
+              {/* Track history polyline (solid blue) */}
+              {trackPoints.length > 1 && (
+                <Polyline
+                  positions={trackPoints.map((p) => [p.lat, p.lng] as [number, number])}
+                  color="#3b82f6"
+                  weight={3}
+                  opacity={0.8}
+                />
+              )}
+              {/* Dashed route line (pickup → dropoff) */}
               {load.pickup_lat && load.dropoff_lat && (
                 <Polyline
                   positions={[
                     [load.pickup_lat, load.pickup_lng],
-                    ...(position ? [[position.lat, position.lng] as [number, number]] : []),
                     [load.dropoff_lat, load.dropoff_lng],
                   ]}
-                  color="#3b82f6"
+                  color="#64748b"
                   weight={2}
                   dashArray="8 4"
-                  opacity={0.6}
+                  opacity={0.4}
                 />
               )}
             </MapContainer>
