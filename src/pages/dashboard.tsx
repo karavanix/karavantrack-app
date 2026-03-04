@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -12,23 +13,24 @@ import { Package, Plus, Building2, Eye } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Load, PaginatedResponse } from "@/types";
 
-const STATUS_TABS = [
-  { value: "all", label: "All" },
-  { value: "created", label: "Created" },
-  { value: "assigned", label: "Assigned" },
-  { value: "in_transit", label: "In Transit" },
-  { value: "completed", label: "Completed" },
-  { value: "confirmed", label: "Confirmed" },
-  { value: "cancelled", label: "Cancelled" },
-] as const;
-
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { selectedCompanyId, companies } = useCompanyStore();
   const [loads, setLoads] = useState<Load[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+
+  const STATUS_TABS = [
+    { value: "all", label: t("dashboard_tab_all") },
+    { value: "created", label: t("dashboard_tab_created") },
+    { value: "assigned", label: t("dashboard_tab_assigned") },
+    { value: "in_transit", label: t("dashboard_tab_in_transit") },
+    { value: "completed", label: t("dashboard_tab_completed") },
+    { value: "confirmed", label: t("dashboard_tab_confirmed") },
+    { value: "cancelled", label: t("dashboard_tab_cancelled") },
+  ] as const;
 
   const fetchLoads = useCallback(async () => {
     if (!selectedCompanyId) return;
@@ -56,7 +58,6 @@ export default function DashboardPage() {
     fetchLoads();
   }, [fetchLoads]);
 
-  // Stats from loaded data
   const stats = {
     active: loads.filter((l) => ["assigned", "accepted", "in_transit"].includes(l.status)).length,
     pending: loads.filter((l) => l.status === "created").length,
@@ -67,26 +68,26 @@ export default function DashboardPage() {
   const columns: ColumnDef<Load>[] = [
     {
       accessorKey: "reference_id",
-      header: "Ref",
+      header: t("dashboard_col_ref"),
       cell: ({ row }) => (
         <code className="text-xs text-muted-foreground">{row.original.reference_id || "—"}</code>
       ),
     },
     {
       accessorKey: "title",
-      header: "Title",
+      header: t("dashboard_col_title"),
       cell: ({ row }) => (
         <span className="font-medium">{row.original.title}</span>
       ),
     },
     {
       accessorKey: "status",
-      header: "Status",
+      header: t("dashboard_col_status"),
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
       accessorKey: "pickup_address",
-      header: "Pickup",
+      header: t("dashboard_col_pickup"),
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground truncate max-w-[200px] block">
           {row.original.pickup_address || `${row.original.pickup_lat?.toFixed(4)}, ${row.original.pickup_lng?.toFixed(4)}`}
@@ -95,7 +96,7 @@ export default function DashboardPage() {
     },
     {
       accessorKey: "dropoff_address",
-      header: "Dropoff",
+      header: t("dashboard_col_dropoff"),
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground truncate max-w-[200px] block">
           {row.original.dropoff_address || `${row.original.dropoff_lat?.toFixed(4)}, ${row.original.dropoff_lng?.toFixed(4)}`}
@@ -104,7 +105,7 @@ export default function DashboardPage() {
     },
     {
       accessorKey: "created_at",
-      header: "Created",
+      header: t("dashboard_col_created"),
       cell: ({ row }) =>
         row.original.created_at
           ? new Date(row.original.created_at).toLocaleDateString()
@@ -121,7 +122,7 @@ export default function DashboardPage() {
           className="gap-1"
         >
           <Eye size={14} />
-          View
+          {t("dashboard_view")}
         </Button>
       ),
     },
@@ -131,9 +132,9 @@ export default function DashboardPage() {
     return (
       <EmptyState
         icon={<Building2 size={32} />}
-        title="Welcome to KaravanTrack"
-        description="Start by creating your first company to begin managing loads and tracking shipments."
-        action={{ label: "Create your first company", onClick: () => navigate("/company/new") }}
+        title={t("dashboard_welcome_title")}
+        description={t("dashboard_welcome_desc")}
+        action={{ label: t("dashboard_welcome_action"), onClick: () => navigate("/company/new") }}
       />
     );
   }
@@ -142,8 +143,8 @@ export default function DashboardPage() {
     return (
       <EmptyState
         icon={<Package size={32} />}
-        title="No company selected"
-        description="Select a company from the header to view loads."
+        title={t("dashboard_no_company")}
+        description={t("dashboard_no_company_desc")}
       />
     );
   }
@@ -153,24 +154,22 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Overview of your shipments and activity
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("dashboard_title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("dashboard_subtitle")}</p>
         </div>
         <Button onClick={() => navigate("/loads/new")}>
           <Plus size={16} />
-          New Load
+          {t("dashboard_new_load")}
         </Button>
       </div>
 
       {/* Stats cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Active", value: stats.active, color: "text-info" },
-          { label: "Pending", value: stats.pending, color: "text-warning" },
-          { label: "Completed", value: stats.completed, color: "text-success" },
-          { label: "Cancelled", value: stats.cancelled, color: "text-destructive" },
+          { label: t("dashboard_stat_active"), value: stats.active, color: "text-info" },
+          { label: t("dashboard_stat_pending"), value: stats.pending, color: "text-warning" },
+          { label: t("dashboard_stat_completed"), value: stats.completed, color: "text-success" },
+          { label: t("dashboard_stat_cancelled"), value: stats.cancelled, color: "text-destructive" },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -206,15 +205,15 @@ export default function DashboardPage() {
             ) : loads.length === 0 ? (
               <EmptyState
                 icon={<Package size={32} />}
-                title="No loads found"
+                title={t("dashboard_no_loads")}
                 description={
                   activeTab === "all"
-                    ? "Create your first load to get started."
-                    : `No loads with status "${tab.label}".`
+                    ? t("dashboard_no_loads_desc_all")
+                    : t("dashboard_no_loads_desc_status", { status: tab.label })
                 }
                 action={
                   activeTab === "all"
-                    ? { label: "Create Load", onClick: () => navigate("/loads/new") }
+                    ? { label: t("dashboard_create_load"), onClick: () => navigate("/loads/new") }
                     : undefined
                 }
               />

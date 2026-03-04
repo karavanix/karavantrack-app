@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -9,15 +10,6 @@ import {
   Building2,
 } from "lucide-react";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Loads", href: "/loads", icon: Package },
-  { name: "Carriers", href: "/carriers", icon: TruckIcon },
-  { name: "Members", href: "/members", icon: Users },
-  { name: "Company", href: "/company", icon: Building2 },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
-
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -25,6 +17,16 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation();
+  const { t } = useTranslation();
+
+  const navigation = [
+    { name: t("nav_dashboard"), href: "/", icon: LayoutDashboard },
+    { name: t("nav_loads"), href: "/loads", icon: Package },
+    { name: t("nav_carriers"), href: "/carriers", icon: TruckIcon },
+    { name: t("nav_members"), href: "/members", icon: Users },
+    { name: t("nav_company"), href: "/company", icon: Building2 },
+    { name: t("nav_settings"), href: "/settings", icon: Settings },
+  ];
 
   return (
     <>
@@ -48,7 +50,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <TruckIcon size={20} />
           </div>
-          <span className="text-lg font-bold tracking-tight">KaravanTrack</span>
+          <span className="text-lg font-bold tracking-tight">{t("brand")}</span>
         </div>
 
         {/* Navigation */}
@@ -61,7 +63,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
             return (
               <NavLink
-                key={item.name}
+                key={item.href}
                 to={item.href}
                 onClick={onClose}
                 className={cn(
@@ -80,7 +82,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Footer */}
         <div className="border-t border-sidebar-border p-4">
-          <p className="text-xs text-muted-foreground">© 2026 KaravanTrack</p>
+          <p className="text-xs text-muted-foreground">{t("copyright")}</p>
         </div>
       </aside>
     </>

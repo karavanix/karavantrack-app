@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -33,11 +34,11 @@ import type { Carrier, CarrierSearchResult, PaginatedResponse } from "@/types";
 
 export default function CarriersPage() {
   const { selectedCompanyId } = useCompanyStore();
+  const { t } = useTranslation();
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Add carrier dialog
   const [addOpen, setAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<CarrierSearchResult[]>([]);
@@ -65,7 +66,6 @@ export default function CarriersPage() {
     fetchCarriers();
   }, [fetchCarriers]);
 
-  // Debounced search
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     setSelectedCarrier(null);
@@ -131,14 +131,14 @@ export default function CarriersPage() {
   const columns: ColumnDef<Carrier>[] = [
     {
       accessorKey: "alias",
-      header: "Alias",
+      header: t("carriers_col_alias"),
       cell: ({ row }) => (
         <span className="font-medium">{row.original.alias || "—"}</span>
       ),
     },
     {
       id: "name",
-      header: "Name",
+      header: t("carriers_col_name"),
       cell: ({ row }) => (
         <span>
           {row.original.first_name} {row.original.last_name}
@@ -147,14 +147,14 @@ export default function CarriersPage() {
     },
     {
       accessorKey: "carrier_id",
-      header: "Carrier ID",
+      header: t("carriers_col_id"),
       cell: ({ row }) => (
         <code className="text-xs text-muted-foreground">{row.original.carrier_id}</code>
       ),
     },
     {
       accessorKey: "created_at",
-      header: "Added",
+      header: t("carriers_col_added"),
       cell: ({ row }) =>
         row.original.created_at
           ? new Date(row.original.created_at).toLocaleDateString()
@@ -172,19 +172,18 @@ export default function CarriersPage() {
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Remove carrier</AlertDialogTitle>
+              <AlertDialogTitle>{t("carriers_remove_title")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Remove <strong>{row.original.alias || "this carrier"}</strong> from the company?
-                They won't be assignable to new loads.
+                {t("carriers_remove_desc", { name: row.original.alias || t("carriers_empty") })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t("carriers_remove_cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => handleRemoveCarrier(row.original.carrier_id)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Remove
+                {t("carriers_remove_confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -197,8 +196,8 @@ export default function CarriersPage() {
     return (
       <EmptyState
         icon={<Truck size={32} />}
-        title="No company selected"
-        description="Select a company from the header to manage carriers."
+        title={t("carriers_no_company")}
+        description={t("carriers_no_company_desc")}
       />
     );
   }
@@ -208,10 +207,8 @@ export default function CarriersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Carriers</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage drivers and carriers assigned to your company
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("carriers_title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("carriers_subtitle")}</p>
         </div>
 
         <Dialog
@@ -224,15 +221,13 @@ export default function CarriersPage() {
           <DialogTrigger asChild>
             <Button>
               <Plus size={16} />
-              Add Carrier
+              {t("carriers_add")}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add Carrier</DialogTitle>
-              <DialogDescription>
-                Search for a carrier by name, email, or phone to add them to your company.
-              </DialogDescription>
+              <DialogTitle>{t("carriers_dialog_title")}</DialogTitle>
+              <DialogDescription>{t("carriers_dialog_desc")}</DialogDescription>
             </DialogHeader>
 
             {addError && (
@@ -244,11 +239,11 @@ export default function CarriersPage() {
 
             {/* Search */}
             <div className="space-y-2">
-              <Label>Search carrier</Label>
+              <Label>{t("carriers_search_label")}</Label>
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Name, email, or phone..."
+                  placeholder={t("carriers_search_placeholder")}
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-9"
@@ -297,17 +292,17 @@ export default function CarriersPage() {
             )}
             {!isSearching && searchQuery.length >= 2 && searchResults.length === 0 && (
               <p className="py-3 text-center text-sm text-muted-foreground">
-                No carriers found for "{searchQuery}"
+                {t("carriers_no_results", { query: searchQuery })}
               </p>
             )}
 
             {/* Alias */}
             {selectedCarrier && (
               <div className="space-y-2">
-                <Label htmlFor="carrier-alias">Alias in company</Label>
+                <Label htmlFor="carrier-alias">{t("carriers_alias_label")}</Label>
                 <Input
                   id="carrier-alias"
-                  placeholder="Driver nickname"
+                  placeholder={t("carriers_alias_placeholder")}
                   value={alias}
                   onChange={(e) => setAlias(e.target.value)}
                 />
@@ -316,14 +311,14 @@ export default function CarriersPage() {
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setAddOpen(false)}>
-                Cancel
+                {t("carriers_cancel")}
               </Button>
               <Button
                 onClick={handleAddCarrier}
                 disabled={!selectedCarrier || addLoading}
               >
                 {addLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
-                Add Carrier
+                {t("carriers_add")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -345,9 +340,9 @@ export default function CarriersPage() {
       ) : carriers.length === 0 ? (
         <EmptyState
           icon={<Truck size={32} />}
-          title="No carriers yet"
-          description="Search and add carriers to assign them to your loads."
-          action={{ label: "Add Carrier", onClick: () => setAddOpen(true) }}
+          title={t("carriers_empty")}
+          description={t("carriers_empty_desc")}
+          action={{ label: t("carriers_add"), onClick: () => setAddOpen(true) }}
         />
       ) : (
         <DataTable columns={columns} data={carriers} />

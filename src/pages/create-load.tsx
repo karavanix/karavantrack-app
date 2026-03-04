@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,6 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix Leaflet default marker icon
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -31,7 +31,7 @@ const pickupIcon = new L.Icon({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
-  className: "hue-rotate-[120deg]", // green tint
+  className: "hue-rotate-[120deg]",
 });
 
 const dropoffIcon = new L.Icon({
@@ -42,7 +42,7 @@ const dropoffIcon = new L.Icon({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
-  className: "hue-rotate-[0deg]", // red (default)
+  className: "hue-rotate-[0deg]",
 });
 
 interface LatLng {
@@ -73,6 +73,7 @@ function MapClickHandler({
 
 export default function CreateLoadPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { selectedCompanyId } = useCompanyStore();
   const [form, setForm] = useState({
     title: "",
@@ -90,12 +91,11 @@ export default function CreateLoadPage() {
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  // Try to get user location for initial map center
-  const [center, setCenter] = useState<LatLng>({ lat: 41.3111, lng: 69.2797 }); // Tashkent default
+  const [center, setCenter] = useState<LatLng>({ lat: 41.3111, lng: 69.2797 });
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
       (pos) => setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {} // silently fail
+      () => {}
     );
   }, []);
 
@@ -104,15 +104,15 @@ export default function CreateLoadPage() {
     setError("");
 
     if (!selectedCompanyId) {
-      setError("Please select a company first");
+      setError(t("create_load_error_no_company"));
       return;
     }
     if (!pickup) {
-      setError("Click on the map to set pickup location");
+      setError(t("create_load_error_no_pickup"));
       return;
     }
     if (!dropoff) {
-      setError("Click on the map to set dropoff location");
+      setError(t("create_load_error_no_dropoff"));
       return;
     }
 
@@ -141,14 +141,12 @@ export default function CreateLoadPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
         <ArrowLeft size={16} />
-        Back
+        {t("create_load_back")}
       </Button>
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Create New Load</h1>
-        <p className="text-sm text-muted-foreground">
-          Set up a new shipment with pickup and dropoff locations
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("create_load_title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("create_load_subtitle")}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -162,14 +160,14 @@ export default function CreateLoadPage() {
         {/* Basic info */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Load Details</CardTitle>
+            <CardTitle className="text-base">{t("create_load_details_card")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="load-title">Title *</Label>
+              <Label htmlFor="load-title">{t("create_load_title_label")}</Label>
               <Input
                 id="load-title"
-                placeholder="e.g. Cotton delivery to warehouse"
+                placeholder={t("create_load_title_placeholder")}
                 value={form.title}
                 onChange={(e) => update("title", e.target.value)}
                 required
@@ -179,10 +177,10 @@ export default function CreateLoadPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="load-desc">Description</Label>
+              <Label htmlFor="load-desc">{t("create_load_desc_label")}</Label>
               <textarea
                 id="load-desc"
-                placeholder="Additional details about the load..."
+                placeholder={t("create_load_desc_placeholder")}
                 value={form.description}
                 onChange={(e) => update("description", e.target.value)}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
@@ -194,7 +192,7 @@ export default function CreateLoadPage() {
         {/* Map */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Locations</CardTitle>
+            <CardTitle className="text-base">{t("create_load_locations_card")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Mode selector */}
@@ -207,7 +205,7 @@ export default function CreateLoadPage() {
                 className="gap-1"
               >
                 <Navigation size={14} />
-                Set Pickup
+                {t("create_load_set_pickup")}
                 {pickup && " ✓"}
               </Button>
               <Button
@@ -218,14 +216,17 @@ export default function CreateLoadPage() {
                 className="gap-1"
               >
                 <MapPin size={14} />
-                Set Dropoff
+                {t("create_load_set_dropoff")}
                 {dropoff && " ✓"}
               </Button>
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Click on the map to place the{" "}
-              <strong>{mapMode === "pickup" ? "pickup" : "dropoff"}</strong> marker
+              {t("create_load_map_hint", {
+                mode: mapMode === "pickup"
+                  ? t("create_load_map_hint_pickup")
+                  : t("create_load_map_hint_dropoff"),
+              })}
             </p>
 
             {/* Map */}
@@ -253,10 +254,10 @@ export default function CreateLoadPage() {
             {/* Address inputs */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="pickup-addr">Pickup address</Label>
+                <Label htmlFor="pickup-addr">{t("create_load_pickup_addr")}</Label>
                 <Input
                   id="pickup-addr"
-                  placeholder="Address or leave empty"
+                  placeholder={t("create_load_addr_placeholder")}
                   value={form.pickup_address}
                   onChange={(e) => update("pickup_address", e.target.value)}
                 />
@@ -267,10 +268,10 @@ export default function CreateLoadPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dropoff-addr">Dropoff address</Label>
+                <Label htmlFor="dropoff-addr">{t("create_load_dropoff_addr")}</Label>
                 <Input
                   id="dropoff-addr"
-                  placeholder="Address or leave empty"
+                  placeholder={t("create_load_addr_placeholder")}
                   value={form.dropoff_address}
                   onChange={(e) => update("dropoff_address", e.target.value)}
                 />
@@ -287,16 +288,16 @@ export default function CreateLoadPage() {
         {/* Submit */}
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-            Cancel
+            {t("create_load_cancel")}
           </Button>
           <Button type="submit" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Spinner size={16} className="text-primary-foreground" />
-                Creating...
+                {t("create_load_creating")}
               </>
             ) : (
-              "Create Load"
+              t("create_load_submit")
             )}
           </Button>
         </div>

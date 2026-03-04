@@ -50,7 +50,7 @@ export const useCompanyStore = create<CompanyState>()(
       },
     }),
     {
-      name: "karavantrack-company",
+      name: "yoollive-company",
       partialize: (state) => ({
         selectedCompanyId: state.selectedCompanyId,
       }),

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth-store";
 import { getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Truck, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { login, isLoading } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,14 +43,14 @@ export default function LoginPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Truck size={28} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">KaravanTrack</h1>
-          <p className="text-sm text-muted-foreground">Shipment tracking platform</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("brand")}</h1>
+          <p className="text-sm text-muted-foreground">{t("tagline_shipper")}</p>
         </div>
 
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center">
-            <CardTitle>Welcome back</CardTitle>
-            <CardDescription>Sign in to your shipper account</CardDescription>
+            <CardTitle>{t("login_welcome_back")}</CardTitle>
+            <CardDescription>{t("login_subtitle")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -60,7 +62,7 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("login_email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -74,7 +76,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("login_password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -90,17 +92,17 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <Spinner size={16} className="text-primary-foreground" />
-                    Signing in...
+                    {t("login_signing_in")}
                   </>
                 ) : (
-                  "Sign in"
+                  t("login_sign_in")
                 )}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                Don&apos;t have an account?{" "}
+                {t("login_no_account")}{" "}
                 <Link to="/register" className="font-medium text-primary hover:underline">
-                  Create one
+                  {t("login_create_one")}
                 </Link>
               </p>
             </form>

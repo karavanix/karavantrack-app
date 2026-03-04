@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Building2, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function CreateCompanyPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { createCompany } = useCompanyStore();
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +23,7 @@ export default function CreateCompanyPage() {
     setError("");
 
     if (name.trim().length < 2) {
-      setError("Company name must be at least 2 characters");
+      setError(t("create_company_error_min"));
       return;
     }
 
@@ -40,7 +42,7 @@ export default function CreateCompanyPage() {
     <div className="mx-auto max-w-lg space-y-6">
       <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
         <ArrowLeft size={16} />
-        Back
+        {t("create_company_back")}
       </Button>
 
       <Card>
@@ -50,8 +52,8 @@ export default function CreateCompanyPage() {
               <Building2 size={20} />
             </div>
             <div>
-              <CardTitle>Create Company</CardTitle>
-              <CardDescription>Set up a new company to manage loads</CardDescription>
+              <CardTitle>{t("create_company_title")}</CardTitle>
+              <CardDescription>{t("create_company_desc")}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -65,10 +67,10 @@ export default function CreateCompanyPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="company-name">Company name</Label>
+              <Label htmlFor="company-name">{t("create_company_name_label")}</Label>
               <Input
                 id="company-name"
-                placeholder="My Logistics Company"
+                placeholder={t("create_company_name_placeholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -77,7 +79,7 @@ export default function CreateCompanyPage() {
                 autoFocus
               />
               <p className="text-xs text-muted-foreground">
-                This will be visible to carriers and team members.
+                {t("create_company_name_hint")}
               </p>
             </div>
 
@@ -85,10 +87,10 @@ export default function CreateCompanyPage() {
               {isLoading ? (
                 <>
                   <Spinner size={16} className="text-primary-foreground" />
-                  Creating...
+                  {t("create_company_creating")}
                 </>
               ) : (
-                "Create Company"
+                t("create_company_submit")
               )}
             </Button>
           </form>

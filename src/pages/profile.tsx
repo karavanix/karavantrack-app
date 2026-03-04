@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { User as UserIcon, Mail, Phone, Shield, Calendar, Check, AlertCircle } f
 
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
+  const { t } = useTranslation();
   const [form, setForm] = useState({ first_name: "", last_name: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -57,8 +59,8 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Profile Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your account information</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("profile_title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("profile_subtitle")}</p>
       </div>
 
       {/* Avatar + Name */}
@@ -82,8 +84,8 @@ export default function ProfilePage() {
       {/* Edit name */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Personal Information</CardTitle>
-          <CardDescription>Update your name. Email and phone are read-only.</CardDescription>
+          <CardTitle className="text-base">{t("profile_personal_title")}</CardTitle>
+          <CardDescription>{t("profile_personal_desc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -96,13 +98,13 @@ export default function ProfilePage() {
             {success && (
               <div className="flex items-center gap-2 rounded-lg bg-success/10 p-3 text-sm text-success">
                 <Check size={16} className="shrink-0" />
-                Profile updated successfully
+                {t("profile_success")}
               </div>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="first-name">First name</Label>
+                <Label htmlFor="first-name">{t("profile_first_name")}</Label>
                 <Input
                   id="first-name"
                   value={form.first_name}
@@ -111,7 +113,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="last-name">Last name</Label>
+                <Label htmlFor="last-name">{t("profile_last_name")}</Label>
                 <Input
                   id="last-name"
                   value={form.last_name}
@@ -127,14 +129,14 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <Mail size={14} />
-                  Email
+                  {t("profile_email")}
                 </Label>
                 <Input value={user.email} disabled className="opacity-60" />
               </div>
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <Phone size={14} />
-                  Phone
+                  {t("profile_phone")}
                 </Label>
                 <Input value={user.phone || "—"} disabled className="opacity-60" />
               </div>
@@ -145,10 +147,10 @@ export default function ProfilePage() {
                 {isSaving ? (
                   <>
                     <Spinner size={16} className="text-primary-foreground" />
-                    Saving...
+                    {t("profile_saving")}
                   </>
                 ) : (
-                  "Save Changes"
+                  t("profile_save")
                 )}
               </Button>
               {isDirty && (
@@ -162,7 +164,7 @@ export default function ProfilePage() {
                     })
                   }
                 >
-                  Reset
+                  {t("profile_reset")}
                 </Button>
               )}
             </div>
@@ -173,28 +175,28 @@ export default function ProfilePage() {
       {/* Account info */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Account</CardTitle>
+          <CardTitle className="text-base">{t("profile_account_title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1">
               <p className="flex items-center gap-1.5 text-xs font-medium uppercase text-muted-foreground">
                 <UserIcon size={12} />
-                User ID
+                {t("profile_user_id")}
               </p>
               <p className="font-mono text-xs truncate">{user.id}</p>
             </div>
             <div className="space-y-1">
               <p className="flex items-center gap-1.5 text-xs font-medium uppercase text-muted-foreground">
                 <Shield size={12} />
-                Role
+                {t("profile_role")}
               </p>
               <p className="text-sm capitalize">{user.role}</p>
             </div>
             <div className="space-y-1">
               <p className="flex items-center gap-1.5 text-xs font-medium uppercase text-muted-foreground">
                 <Calendar size={12} />
-                Joined
+                {t("profile_joined")}
               </p>
               <p className="text-sm">
                 {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth-store";
 import { getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Truck, AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { register, isLoading } = useAuthStore();
   const [form, setForm] = useState({
     first_name: "",
@@ -30,12 +32,12 @@ export default function RegisterPage() {
     setError("");
 
     if (form.password !== form.confirmPassword) {
-      setError("Passwords don't match");
+      setError(t("register_error_password_match"));
       return;
     }
 
     if (form.password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("register_error_password_length"));
       return;
     }
 
@@ -67,14 +69,14 @@ export default function RegisterPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Truck size={28} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">KaravanTrack</h1>
-          <p className="text-sm text-muted-foreground">Create your shipper account</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("brand")}</h1>
+          <p className="text-sm text-muted-foreground">{t("tagline_create")}</p>
         </div>
 
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center">
-            <CardTitle>Get started</CardTitle>
-            <CardDescription>Create an account to manage your shipments</CardDescription>
+            <CardTitle>{t("register_get_started")}</CardTitle>
+            <CardDescription>{t("register_subtitle")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -87,7 +89,7 @@ export default function RegisterPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="first_name">First name</Label>
+                  <Label htmlFor="first_name">{t("register_first_name")}</Label>
                   <Input
                     id="first_name"
                     placeholder="John"
@@ -98,7 +100,7 @@ export default function RegisterPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last_name">Last name</Label>
+                  <Label htmlFor="last_name">{t("register_last_name")}</Label>
                   <Input
                     id="last_name"
                     placeholder="Doe"
@@ -110,7 +112,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reg-email">Email</Label>
+                <Label htmlFor="reg-email">{t("register_email")}</Label>
                 <Input
                   id="reg-email"
                   type="email"
@@ -124,7 +126,7 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="phone">
-                  Phone <span className="text-muted-foreground">(optional)</span>
+                  {t("register_phone")} <span className="text-muted-foreground">{t("register_phone_optional")}</span>
                 </Label>
                 <Input
                   id="phone"
@@ -137,11 +139,11 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reg-password">Password</Label>
+                <Label htmlFor="reg-password">{t("register_password")}</Label>
                 <Input
                   id="reg-password"
                   type="password"
-                  placeholder="At least 6 characters"
+                  placeholder={t("register_password_placeholder")}
                   value={form.password}
                   onChange={(e) => update("password", e.target.value)}
                   required
@@ -150,11 +152,11 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm password</Label>
+                <Label htmlFor="confirm-password">{t("register_confirm_password")}</Label>
                 <Input
                   id="confirm-password"
                   type="password"
-                  placeholder="Repeat password"
+                  placeholder={t("register_repeat_password")}
                   value={form.confirmPassword}
                   onChange={(e) => update("confirmPassword", e.target.value)}
                   required
@@ -166,17 +168,17 @@ export default function RegisterPage() {
                 {isLoading ? (
                   <>
                     <Spinner size={16} className="text-primary-foreground" />
-                    Creating account...
+                    {t("register_creating")}
                   </>
                 ) : (
-                  "Create account"
+                  t("register_create")
                 )}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                Already have an account?{" "}
+                {t("register_already_account")}{" "}
                 <Link to="/login" className="font-medium text-primary hover:underline">
-                  Sign in
+                  {t("register_sign_in")}
                 </Link>
               </p>
             </form>

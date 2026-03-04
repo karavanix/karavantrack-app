@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import type { Company } from "@/types";
 
 export default function CompanySettingsPage() {
   const { selectedCompanyId, fetchCompanies } = useCompanyStore();
+  const { t } = useTranslation();
   const [company, setCompany] = useState<Company | null>(null);
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function CompanySettingsPage() {
     setSuccess(false);
 
     if (name.trim().length < 2) {
-      setError("Company name must be at least 2 characters");
+      setError(t("company_settings_error_min"));
       return;
     }
 
@@ -58,7 +60,7 @@ export default function CompanySettingsPage() {
   if (!selectedCompanyId) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20">
-        <p className="text-sm text-muted-foreground">Select a company to view settings</p>
+        <p className="text-sm text-muted-foreground">{t("company_settings_select")}</p>
       </div>
     );
   }
@@ -74,8 +76,8 @@ export default function CompanySettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Company Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your company profile</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("company_settings_title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("company_settings_subtitle")}</p>
       </div>
 
       <Card>
@@ -85,9 +87,9 @@ export default function CompanySettingsPage() {
               <Building2 size={20} />
             </div>
             <div>
-              <CardTitle>General</CardTitle>
+              <CardTitle>{t("company_settings_general")}</CardTitle>
               <CardDescription>
-                Company ID: <code className="text-xs">{company?.id}</code>
+                {t("company_settings_id_label")} <code className="text-xs">{company?.id}</code>
               </CardDescription>
             </div>
           </div>
@@ -103,17 +105,17 @@ export default function CompanySettingsPage() {
             {success && (
               <div className="flex items-center gap-2 rounded-lg bg-success/10 p-3 text-sm text-success">
                 <Check size={16} className="shrink-0" />
-                Company updated successfully
+                {t("company_settings_success")}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Company name</Label>
+              <Label htmlFor="edit-name">{t("company_settings_name_label")}</Label>
               <Input
                 id="edit-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Company name"
+                placeholder={t("company_settings_name_placeholder")}
                 required
                 minLength={2}
                 maxLength={255}
@@ -125,10 +127,10 @@ export default function CompanySettingsPage() {
                 {isSaving ? (
                   <>
                     <Spinner size={16} className="text-primary-foreground" />
-                    Saving...
+                    {t("company_settings_saving")}
                   </>
                 ) : (
-                  "Save Changes"
+                  t("company_settings_save")
                 )}
               </Button>
               {name !== company?.name && (
@@ -137,7 +139,7 @@ export default function CompanySettingsPage() {
                   variant="ghost"
                   onClick={() => setName(company?.name ?? "")}
                 >
-                  Reset
+                  {t("company_settings_reset")}
                 </Button>
               )}
             </div>
@@ -150,19 +152,19 @@ export default function CompanySettingsPage() {
         <CardContent className="pt-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Owner ID</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t("company_settings_owner_id")}</p>
               <p className="mt-1 text-sm font-mono">{company?.owner_id}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t("company_settings_status")}</p>
               <p className="mt-1 text-sm capitalize">{company?.status}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Your Role</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t("company_settings_your_role")}</p>
               <p className="mt-1 text-sm capitalize">{company?.role}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Created</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t("company_settings_created")}</p>
               <p className="mt-1 text-sm">
                 {company?.created_at
                   ? new Date(company.created_at).toLocaleDateString()

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -34,11 +35,11 @@ import type { Member, PaginatedResponse } from "@/types";
 
 export default function MembersPage() {
   const { selectedCompanyId } = useCompanyStore();
+  const { t } = useTranslation();
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Add member dialog state
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ user_id: "", alias: "", role: "member" as "admin" | "member" });
   const [addLoading, setAddLoading] = useState(false);
@@ -89,21 +90,21 @@ export default function MembersPage() {
   const columns: ColumnDef<Member>[] = [
     {
       accessorKey: "alias",
-      header: "Alias",
+      header: t("members_col_alias"),
       cell: ({ row }) => (
         <span className="font-medium">{row.original.alias || "—"}</span>
       ),
     },
     {
       accessorKey: "member_id",
-      header: "User ID",
+      header: t("members_col_user_id"),
       cell: ({ row }) => (
         <code className="text-xs text-muted-foreground">{row.original.member_id}</code>
       ),
     },
     {
       accessorKey: "role",
-      header: "Role",
+      header: t("members_col_role"),
       cell: ({ row }) => (
         <Badge variant={row.original.role === "admin" ? "default" : "secondary"}>
           {row.original.role}
@@ -112,7 +113,7 @@ export default function MembersPage() {
     },
     {
       accessorKey: "created_at",
-      header: "Joined",
+      header: t("members_col_joined"),
       cell: ({ row }) =>
         row.original.created_at
           ? new Date(row.original.created_at).toLocaleDateString()
@@ -130,19 +131,16 @@ export default function MembersPage() {
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Remove member</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to remove this member from the company? They will lose access
-                to all company resources.
-              </AlertDialogDescription>
+              <AlertDialogTitle>{t("members_remove_title")}</AlertDialogTitle>
+              <AlertDialogDescription>{t("members_remove_desc")}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t("members_remove_cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => handleRemoveMember(row.original.member_id)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Remove
+                {t("members_remove_confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -155,8 +153,8 @@ export default function MembersPage() {
     return (
       <EmptyState
         icon={<Users size={32} />}
-        title="No company selected"
-        description="Select a company from the header to manage members."
+        title={t("members_no_company")}
+        description={t("members_no_company_desc")}
       />
     );
   }
@@ -166,25 +164,21 @@ export default function MembersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Members</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage team members who can access this company
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("members_title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("members_subtitle")}</p>
         </div>
 
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus size={16} />
-              Add Member
+              {t("members_add")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Member</DialogTitle>
-              <DialogDescription>
-                Invite a user to join this company by their User ID.
-              </DialogDescription>
+              <DialogTitle>{t("members_dialog_title")}</DialogTitle>
+              <DialogDescription>{t("members_dialog_desc")}</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddMember} className="space-y-4">
               {addError && (
@@ -194,27 +188,27 @@ export default function MembersPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="member-user-id">User ID</Label>
+                <Label htmlFor="member-user-id">{t("members_user_id_label")}</Label>
                 <Input
                   id="member-user-id"
-                  placeholder="Enter user ID"
+                  placeholder={t("members_user_id_placeholder")}
                   value={addForm.user_id}
                   onChange={(e) => setAddForm((p) => ({ ...p, user_id: e.target.value }))}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="member-alias">Alias</Label>
+                <Label htmlFor="member-alias">{t("members_alias_label")}</Label>
                 <Input
                   id="member-alias"
-                  placeholder="Nickname in company"
+                  placeholder={t("members_alias_placeholder")}
                   value={addForm.alias}
                   onChange={(e) => setAddForm((p) => ({ ...p, alias: e.target.value }))}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label>Role</Label>
+                <Label>{t("members_role_label")}</Label>
                 <div className="flex gap-2">
                   {(["member", "admin"] as const).map((role) => (
                     <Button
@@ -236,11 +230,11 @@ export default function MembersPage() {
                   variant="outline"
                   onClick={() => setAddOpen(false)}
                 >
-                  Cancel
+                  {t("members_cancel")}
                 </Button>
                 <Button type="submit" disabled={addLoading}>
                   {addLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
-                  Add Member
+                  {t("members_add")}
                 </Button>
               </DialogFooter>
             </form>
@@ -263,9 +257,9 @@ export default function MembersPage() {
       ) : members.length === 0 ? (
         <EmptyState
           icon={<Users size={32} />}
-          title="No members yet"
-          description="Add team members to give them access to this company's resources."
-          action={{ label: "Add Member", onClick: () => setAddOpen(true) }}
+          title={t("members_empty")}
+          description={t("members_empty_desc")}
+          action={{ label: t("members_add"), onClick: () => setAddOpen(true) }}
         />
       ) : (
         <DataTable columns={columns} data={members} />

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
@@ -97,6 +98,7 @@ function MapFlyTo({ position }: { position: [number, number] | null }) {
 export default function LoadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { selectedCompanyId } = useCompanyStore();
   const [load, setLoad] = useState<Load | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
@@ -222,11 +224,11 @@ export default function LoadDetailPage() {
       <div className="mx-auto max-w-lg space-y-4 py-12">
         <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
           <AlertCircle size={16} />
-          {error || "Load not found"}
+          {error || t("load_detail_not_found")}
         </div>
         <Button variant="ghost" onClick={() => navigate(-1)}>
           <ArrowLeft size={16} />
-          Go back
+          {t("load_detail_back")}
         </Button>
       </div>
     );
@@ -247,7 +249,7 @@ export default function LoadDetailPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
         <ArrowLeft size={16} />
-        Back
+        {t("load_detail_back")}
       </Button>
 
       {/* Header */}
@@ -266,7 +268,7 @@ export default function LoadDetailPage() {
               {isTrackable && (
                 <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
                   <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
-                  {isConnected ? "Live" : "Offline"}
+                  {isConnected ? "Live" : t("common_error")}
                 </Badge>
               )}
             </div>
@@ -284,7 +286,7 @@ export default function LoadDetailPage() {
               className="gap-1"
             >
               <UserPlus size={16} />
-              Assign Carrier
+              {t("load_detail_assign_carrier")}
             </Button>
           )}
           {canConfirm && (
@@ -298,23 +300,23 @@ export default function LoadDetailPage() {
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="gap-1">
                   <XCircle size={16} />
-                  Cancel
+                  {t("load_detail_cancel_load")}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel this load?</AlertDialogTitle>
+                  <AlertDialogTitle>{t("load_detail_cancel_load")}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will cancel the load. This action can&apos;t be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Keep</AlertDialogCancel>
+                  <AlertDialogCancel>{t("common_cancel")}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleCancel}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Cancel Load
+                    {t("load_detail_cancel_load")}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -386,11 +388,11 @@ export default function LoadDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <Navigation size={14} className="text-success" />
-              Pickup
+              {t("load_detail_pickup")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <p className="font-medium">{load.pickup_address || "No address"}</p>
+            <p className="font-medium">{load.pickup_address || t("load_detail_no_description")}</p>
             <p className="text-xs text-muted-foreground">
               {load.pickup_lat?.toFixed(5)}, {load.pickup_lng?.toFixed(5)}
             </p>
@@ -406,11 +408,11 @@ export default function LoadDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <MapPin size={14} className="text-destructive" />
-              Dropoff
+              {t("load_detail_dropoff")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <p className="font-medium">{load.dropoff_address || "No address"}</p>
+            <p className="font-medium">{load.dropoff_address || t("load_detail_no_description")}</p>
             <p className="text-xs text-muted-foreground">
               {load.dropoff_lat?.toFixed(5)}, {load.dropoff_lng?.toFixed(5)}
             </p>
@@ -426,14 +428,14 @@ export default function LoadDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <User size={14} />
-              Carrier
+              {t("load_detail_carrier")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {load.carrier_id ? (
               <code className="text-sm">{load.carrier_id}</code>
             ) : (
-              <p className="text-sm text-muted-foreground">Not assigned</p>
+              <p className="text-sm text-muted-foreground">{t("load_detail_no_description")}</p>
             )}
           </CardContent>
         </Card>
@@ -447,7 +449,7 @@ export default function LoadDetailPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p>
-              <span className="text-muted-foreground">Created:</span>{" "}
+              <span className="text-muted-foreground">{t("load_detail_created")}:</span>{" "}
               {load.created_at ? new Date(load.created_at).toLocaleString() : "—"}
             </p>
             <p>
@@ -462,7 +464,7 @@ export default function LoadDetailPage() {
       {load.description && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Description</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t("load_detail_description")}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm whitespace-pre-wrap">{load.description}</p>
@@ -474,7 +476,7 @@ export default function LoadDetailPage() {
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Carrier</DialogTitle>
+            <DialogTitle>{t("load_detail_assign_carrier")}</DialogTitle>
             <DialogDescription>
               Select a carrier from your company to assign to this load.
             </DialogDescription>
@@ -537,14 +539,14 @@ export default function LoadDetailPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignOpen(false)}>
-              Cancel
+              {t("common_cancel")}
             </Button>
             <Button
               onClick={handleAssign}
               disabled={!selectedCarrierId || assignLoading}
             >
               {assignLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
-              Assign
+              {t("load_detail_assign_carrier")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -10,8 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { Menu, ChevronDown, LogOut, User, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -19,6 +21,7 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user, logout } = useAuthStore();
   const { companies, selectedCompanyId, selectCompany } = useCompanyStore();
 
@@ -51,12 +54,12 @@ export function Header({ onMenuClick }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="gap-2 text-sm font-medium">
                 <Building2 size={16} className="text-primary" />
-                {currentCompany?.name ?? "Select company"}
+                {currentCompany?.name ?? t("header_select_company")}
                 <ChevronDown size={14} className="text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Your companies</DropdownMenuLabel>
+              <DropdownMenuLabel>{t("header_your_companies")}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {companies.map((company) => (
                 <DropdownMenuItem
@@ -74,50 +77,55 @@ export function Header({ onMenuClick }: HeaderProps) {
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/company/new")}>
-                + Create new company
+                {t("header_create_new_company")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
 
-      {/* Right: User menu */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="gap-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-            </Avatar>
-            <span className="hidden text-sm font-medium md:inline">
-              {user?.first_name} {user?.last_name}
-            </span>
-            <ChevronDown size={14} className="text-muted-foreground" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium">
+      {/* Right: Language switcher + User menu */}
+      <div className="flex items-center gap-1">
+        <LanguageSwitcher />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+              </Avatar>
+              <span className="hidden text-sm font-medium md:inline">
                 {user?.first_name} {user?.last_name}
               </span>
-              <span className="text-xs text-muted-foreground">{user?.email}</span>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate("/settings")}>
-            <User size={14} />
-            Profile
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={handleLogout}
-            className="text-destructive focus:text-destructive"
-          >
-            <LogOut size={14} />
-            Log out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+              <ChevronDown size={14} className="text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium">
+                  {user?.first_name} {user?.last_name}
+                </span>
+                <span className="text-xs text-muted-foreground">{user?.email}</span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/settings")}>
+              <User size={14} />
+              {t("header_profile")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="text-destructive focus:text-destructive"
+            >
+              <LogOut size={14} />
+              {t("header_logout")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }
+
