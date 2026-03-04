@@ -11,13 +11,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
 import { Package, Plus, Building2, Eye } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Load, PaginatedResponse } from "@/types";
+import type { Load, LoadStats, PaginatedResponse } from "@/types";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { selectedCompanyId, companies } = useCompanyStore();
   const [loads, setLoads] = useState<Load[]>([]);
+  const [stats, setStats] = useState<LoadStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("all");
@@ -32,21 +33,25 @@ export default function DashboardPage() {
     { value: "cancelled", label: t("dashboard_tab_cancelled") },
   ] as const;
 
-  const fetchLoads = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!selectedCompanyId) return;
     setIsLoading(true);
     setError("");
     try {
-      const params: Record<string, string | number> = {
-        company_id: selectedCompanyId,
-        limit: 100,
-        offset: 0,
-      };
-      if (activeTab !== "all") {
-        params.status = activeTab;
-      }
-      const { data } = await api.get<PaginatedResponse<Load>>("/loads", { params });
-      setLoads(data?.result ?? []);
+      const loadsParams: Record<string, string | number> = { limit: 100, offset: 0 };
+      if (activeTab !== "all") loadsParams.status = activeTab;
+
+      // Fetch loads and stats in parallel from the dedicated stats endpoint
+      const [loadsRes, statsRes] = await Promise.all([
+        api.get<PaginatedResponse<Load> | Load[]>(
+          `/companies/${selectedCompanyId}/loads`,
+          { params: loadsParams }
+        ),
+        api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`),
+      ]);
+
+      setLoads(Array.isArray(loadsRes.data) ? loadsRes.data : (loadsRes.data?.result ?? []));
+      setStats(statsRes.data);
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -55,15 +60,8 @@ export default function DashboardPage() {
   }, [selectedCompanyId, activeTab]);
 
   useEffect(() => {
-    fetchLoads();
-  }, [fetchLoads]);
-
-  const stats = {
-    active: loads.filter((l) => ["assigned", "accepted", "in_transit"].includes(l.status)).length,
-    pending: loads.filter((l) => l.status === "created").length,
-    completed: loads.filter((l) => ["completed", "confirmed"].includes(l.status)).length,
-    cancelled: loads.filter((l) => l.status === "cancelled").length,
-  };
+    fetchData();
+  }, [fetchData]);
 
   const columns: ColumnDef<Load>[] = [
     {
@@ -76,9 +74,7 @@ export default function DashboardPage() {
     {
       accessorKey: "title",
       header: t("dashboard_col_title"),
-      cell: ({ row }) => (
-        <span className="font-medium">{row.original.title}</span>
-      ),
+      cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
     },
     {
       accessorKey: "status",
@@ -90,7 +86,8 @@ export default function DashboardPage() {
       header: t("dashboard_col_pickup"),
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground truncate max-w-[200px] block">
-          {row.original.pickup_address || `${row.original.pickup_lat?.toFixed(4)}, ${row.original.pickup_lng?.toFixed(4)}`}
+          {row.original.pickup_address ||
+            `${row.original.pickup_lat?.toFixed(4)}, ${row.original.pickup_lng?.toFixed(4)}`}
         </span>
       ),
     },
@@ -99,7 +96,8 @@ export default function DashboardPage() {
       header: t("dashboard_col_dropoff"),
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground truncate max-w-[200px] block">
-          {row.original.dropoff_address || `${row.original.dropoff_lat?.toFixed(4)}, ${row.original.dropoff_lng?.toFixed(4)}`}
+          {row.original.dropoff_address ||
+            `${row.original.dropoff_lat?.toFixed(4)}, ${row.original.dropoff_lng?.toFixed(4)}`}
         </span>
       ),
     },
@@ -163,25 +161,27 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats cards — sourced from /companies/{id}/loads/stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: t("dashboard_stat_active"), value: stats.active, color: "text-info" },
-          { label: t("dashboard_stat_pending"), value: stats.pending, color: "text-warning" },
-          { label: t("dashboard_stat_completed"), value: stats.completed, color: "text-success" },
-          { label: t("dashboard_stat_cancelled"), value: stats.cancelled, color: "text-destructive" },
+          { label: t("dashboard_stat_active"), value: stats?.active, color: "text-info" },
+          { label: t("dashboard_stat_pending"), value: stats?.pending, color: "text-warning" },
+          { label: t("dashboard_stat_completed"), value: stats?.completed, color: "text-success" },
+          { label: t("dashboard_stat_cancelled"), value: stats?.canceled, color: "text-destructive" },
+          { label: t("dashboard_stat_total"), value: stats?.total, color: "text-foreground" },
         ].map((stat) => (
           <div
             key={stat.label}
             className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md"
           >
             <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-            <p className={`mt-1 text-3xl font-bold ${stat.color}`}>{stat.value}</p>
+            <p className={`mt-1 text-3xl font-bold ${stat.color}`}>
+              {stat.value ?? (isLoading ? <Spinner size={20} /> : "—")}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Error */}
       {error && (
         <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
       )}

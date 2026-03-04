@@ -78,6 +78,7 @@ export default function CreateLoadPage() {
   const [form, setForm] = useState({
     title: "",
     description: "",
+    reference_id: "",
     pickup_address: "",
     dropoff_address: "",
   });
@@ -122,6 +123,7 @@ export default function CreateLoadPage() {
         company_id: selectedCompanyId,
         title: form.title.trim(),
         description: form.description.trim() || undefined,
+        reference_id: form.reference_id.trim() || undefined,
         pickup_address: form.pickup_address.trim() || undefined,
         pickup_lat: pickup.lat,
         pickup_lng: pickup.lng,
@@ -177,6 +179,19 @@ export default function CreateLoadPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="load-ref">
+                {t("create_load_ref_label")}{" "}
+                <span className="text-xs text-muted-foreground">{t("register_phone_optional")}</span>
+              </Label>
+              <Input
+                id="load-ref"
+                placeholder={t("create_load_ref_placeholder")}
+                value={form.reference_id}
+                onChange={(e) => update("reference_id", e.target.value)}
+                maxLength={100}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="load-desc">{t("create_load_desc_label")}</Label>
               <textarea
                 id="load-desc"
@@ -188,6 +203,7 @@ export default function CreateLoadPage() {
             </div>
           </CardContent>
         </Card>
+
 
         {/* Map */}
         <Card>

@@ -78,6 +78,17 @@ export interface AddMemberRequest {
   role: "admin" | "member";
 }
 
+export interface MemberSearchResult {
+  id: string;
+  email: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ──── Carriers ────
 export interface Carrier {
   carrier_id: string;
@@ -138,6 +149,7 @@ export interface CreateLoadRequest {
   company_id: string;
   title: string;
   description?: string;
+  reference_id?: string;
   pickup_address?: string;
   pickup_lat: number;
   pickup_lng: number;
@@ -199,4 +211,13 @@ export interface LoadListParams extends PaginationParams {
   company_id?: string;
   carrier_id?: string;
   status?: string;
+}
+
+// ──── Dashboard Stats ────
+export interface LoadStats {
+  active: number;
+  pending: number;
+  completed: number;
+  canceled: number;
+  total: number;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
@@ -29,9 +29,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Users, Plus, Trash2, AlertCircle, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Member, PaginatedResponse } from "@/types";
+import type { Member, MemberSearchResult, PaginatedResponse } from "@/types";
 
 export default function MembersPage() {
   const { selectedCompanyId } = useCompanyStore();
@@ -41,9 +41,15 @@ export default function MembersPage() {
   const [error, setError] = useState("");
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ user_id: "", alias: "", role: "member" as "admin" | "member" });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<MemberSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<MemberSearchResult | null>(null);
+  const [alias, setAlias] = useState("");
+  const [role, setRole] = useState<"admin" | "member">("member");
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
   const fetchMembers = useCallback(async () => {
     if (!selectedCompanyId) return;
@@ -62,20 +68,60 @@ export default function MembersPage() {
     fetchMembers();
   }, [fetchMembers]);
 
-  const handleAddMember = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setSelectedUser(null);
+
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+
+    if (value.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    searchTimer.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const { data } = await api.get<PaginatedResponse<MemberSearchResult> | MemberSearchResult[]>(
+          "/users/shippers/search",
+          { params: { q: value.trim() } }
+        );
+        setSearchResults(Array.isArray(data) ? data : (data?.result ?? []));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+  };
+
+  const handleAddMember = async () => {
+    if (!selectedUser || !selectedCompanyId) return;
     setAddError("");
     setAddLoading(true);
     try {
-      await api.post(`/companies/${selectedCompanyId}/members`, addForm);
+      await api.post(`/companies/${selectedCompanyId}/members`, {
+        user_id: selectedUser.id,
+        alias: alias.trim() || `${selectedUser.first_name} ${selectedUser.last_name}`.trim(),
+        role,
+      });
       setAddOpen(false);
-      setAddForm({ user_id: "", alias: "", role: "member" });
+      resetAddForm();
       await fetchMembers();
     } catch (err) {
       setAddError(getApiErrorMessage(err));
     } finally {
       setAddLoading(false);
     }
+  };
+
+  const resetAddForm = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedUser(null);
+    setAlias("");
+    setRole("member");
+    setAddError("");
   };
 
   const handleRemoveMember = async (memberId: string) => {
@@ -168,76 +214,132 @@ export default function MembersPage() {
           <p className="text-sm text-muted-foreground">{t("members_subtitle")}</p>
         </div>
 
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <Dialog
+          open={addOpen}
+          onOpenChange={(open) => {
+            setAddOpen(open);
+            if (!open) resetAddForm();
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus size={16} />
               {t("members_add")}
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{t("members_dialog_title")}</DialogTitle>
               <DialogDescription>{t("members_dialog_desc")}</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddMember} className="space-y-4">
-              {addError && (
-                <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                  <AlertCircle size={16} className="shrink-0" />
-                  {addError}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="member-user-id">{t("members_user_id_label")}</Label>
+
+            {addError && (
+              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle size={16} className="shrink-0" />
+                {addError}
+              </div>
+            )}
+
+            {/* Search */}
+            <div className="space-y-2">
+              <Label>{t("members_search_label")}</Label>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="member-user-id"
-                  placeholder={t("members_user_id_placeholder")}
-                  value={addForm.user_id}
-                  onChange={(e) => setAddForm((p) => ({ ...p, user_id: e.target.value }))}
-                  required
+                  placeholder={t("members_search_placeholder")}
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9"
+                  autoFocus
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="member-alias">{t("members_alias_label")}</Label>
-                <Input
-                  id="member-alias"
-                  placeholder={t("members_alias_placeholder")}
-                  value={addForm.alias}
-                  onChange={(e) => setAddForm((p) => ({ ...p, alias: e.target.value }))}
-                  required
-                />
+            </div>
+
+            {/* Search results */}
+            {isSearching && (
+              <div className="flex justify-center py-4">
+                <Spinner size={20} />
               </div>
-              <div className="space-y-2">
-                <Label>{t("members_role_label")}</Label>
-                <div className="flex gap-2">
-                  {(["member", "admin"] as const).map((role) => (
-                    <Button
-                      key={role}
-                      type="button"
-                      variant={addForm.role === role ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setAddForm((p) => ({ ...p, role }))}
-                      className="capitalize"
-                    >
-                      {role}
-                    </Button>
-                  ))}
+            )}
+            {!isSearching && searchResults.length > 0 && (
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-1">
+                {searchResults.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUser(user);
+                      setAlias(`${user.first_name} ${user.last_name}`.trim());
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
+                      selectedUser?.id === user.id
+                        ? "bg-primary/10 text-primary"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                      {user.first_name?.[0]}
+                      {user.last_name?.[0]}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="font-medium truncate">
+                        {user.first_name} {user.last_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {user.email || user.phone}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {!isSearching && searchQuery.length >= 2 && searchResults.length === 0 && (
+              <p className="py-3 text-center text-sm text-muted-foreground">
+                {t("members_no_results", { query: searchQuery })}
+              </p>
+            )}
+
+            {/* Alias & Role — only shown after selecting a user */}
+            {selectedUser && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="member-alias">{t("members_alias_label")}</Label>
+                  <Input
+                    id="member-alias"
+                    placeholder={t("members_alias_placeholder")}
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
+                  />
                 </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAddOpen(false)}
-                >
-                  {t("members_cancel")}
-                </Button>
-                <Button type="submit" disabled={addLoading}>
-                  {addLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
-                  {t("members_add")}
-                </Button>
-              </DialogFooter>
-            </form>
+                <div className="space-y-2">
+                  <Label>{t("members_role_label")}</Label>
+                  <div className="flex gap-2">
+                    {(["member", "admin"] as const).map((r) => (
+                      <Button
+                        key={r}
+                        type="button"
+                        variant={role === r ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setRole(r)}
+                        className="capitalize"
+                      >
+                        {r}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddOpen(false)}>
+                {t("members_cancel")}
+              </Button>
+              <Button onClick={handleAddMember} disabled={!selectedUser || addLoading}>
+                {addLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
+                {t("members_add")}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
