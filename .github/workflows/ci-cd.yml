@@ -58,10 +58,7 @@ jobs:
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.short_sha }}
             cd /opt/yoollive/app
-            cat > .env.frontend << 'EOL'
-            ${{ vars.ENV_FILE }}
-            EOL
-            echo "IMAGE_TAG=${{ needs.build.outputs.short_sha }}" > .env.frontend.release
+            export FRONTEND_IMAGE_TAG=${{ needs.build.outputs.short_sha }}
             docker compose pull frontend
-            docker compose --env-file .env.frontend.release up -d --no-deps frontend
+            docker compose up -d --no-deps frontend
             docker image prune -f
