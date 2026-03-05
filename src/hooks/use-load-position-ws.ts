@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useAuthStore } from "@/stores/auth-store";
+import { useEffect, useState } from "react";
+import { wsClient } from "@/lib/ws-client";
 import type { Position } from "@/types";
 
 interface UseLoadPositionWSOptions {
@@ -13,95 +13,65 @@ export function useLoadPositionWS({
   enabled = true,
   onPosition,
 }: UseLoadPositionWSOptions) {
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(wsClient.connected);
   const [lastPosition, setLastPosition] = useState<Position | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const retryCount = useRef(0);
-  const maxRetries = 10;
-
-  const connect = useCallback(() => {
-    if (!loadId || !enabled) return;
-
-    const token = useAuthStore.getState().accessToken;
-    if (!token) return;
-
-    // Build WebSocket URL: swap http→ws, keep /api/v1 prefix (spec: basePath=/api/v1, path=/ws)
-    const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1";
-    const wsBase = apiBase.replace(/^http/, "ws");
-    const wsUrl = `${wsBase}/ws?token=${encodeURIComponent(token)}&load_id=${loadId}`;
-
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setIsConnected(true);
-        setError(null);
-        retryCount.current = 0;
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          // The WS may send position updates
-          if (data.lat !== undefined && data.lng !== undefined) {
-            const pos: Position = {
-              load_id: data.load_id || loadId,
-              carrier_id: data.carrier_id || "",
-              lat: data.lat,
-              lng: data.lng,
-              speed_mps: data.speed_mps ?? 0,
-              heading_deg: data.heading_deg ?? 0,
-              accuracy_m: data.accuracy_m ?? 0,
-              recorded_at: data.recorded_at || new Date().toISOString(),
-            };
-            setLastPosition(pos);
-            onPosition?.(pos);
-          }
-        } catch {
-          // Ignore non-JSON messages
-        }
-      };
-
-      ws.onerror = () => {
-        setError("WebSocket connection error");
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        wsRef.current = null;
-
-        // Auto-reconnect with backoff
-        if (enabled && retryCount.current < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30000);
-          retryCount.current += 1;
-          reconnectTimer.current = setTimeout(connect, delay);
-        }
-      };
-    } catch {
-      setError("Failed to create WebSocket");
-    }
-  }, [loadId, enabled, onPosition]);
-
-  const disconnect = useCallback(() => {
-    if (reconnectTimer.current) {
-      clearTimeout(reconnectTimer.current);
-      reconnectTimer.current = null;
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setIsConnected(false);
-    retryCount.current = 0;
-  }, []);
 
   useEffect(() => {
-    connect();
-    return disconnect;
-  }, [connect, disconnect]);
+    if (!loadId || !enabled) return;
 
-  return { isConnected, lastPosition, error, disconnect, reconnect: connect };
+    // Join this load's room on the shared connection
+    wsClient.join(loadId);
+
+    // Subscribe to incoming envelopes
+    const unsubscribe = wsClient.subscribe((envelope) => {
+      switch (envelope.event) {
+        case "join_success":
+          setIsConnected(true);
+          setError(null);
+          break;
+
+        case "leave_success":
+          setIsConnected(false);
+          break;
+
+        case "location": {
+          const d = envelope.data as Record<string, unknown> | undefined;
+          if (!d || d.lat === undefined || d.lng === undefined) break;
+
+          const pos: Position = {
+            load_id: (d.load_id as string) || loadId,
+            carrier_id: (d.carrier_id as string) || "",
+            lat: d.lat as number,
+            lng: d.lng as number,
+            speed_mps: (d.speed_mps as number) ?? 0,
+            heading_deg: (d.heading_deg as number) ?? 0,
+            accuracy_m: (d.accuracy_m as number) ?? 0,
+            recorded_at: (d.recorded_at as string) || new Date().toISOString(),
+          };
+          setLastPosition(pos);
+          onPosition?.(pos);
+          break;
+        }
+
+        case "error": {
+          const d = envelope.data as Record<string, unknown> | undefined;
+          const code = (d?.code as string) ?? "UNKNOWN";
+          const msg = (d?.message as string) ?? "WebSocket error";
+          setError(`[${code}] ${msg}`);
+          break;
+        }
+      }
+    });
+
+    return () => {
+      // Leave the room and clean up handler when leaving the page
+      wsClient.leave();
+      unsubscribe();
+      setIsConnected(false);
+      setLastPosition(null);
+    };
+  }, [loadId, enabled]);
+
+  return { isConnected, lastPosition, error };
 }

@@ -5,6 +5,7 @@ import { useCompanyStore } from "@/stores/company-store";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { LoadingScreen } from "@/components/ui/spinner";
+import { wsClient } from "@/lib/ws-client";
 
 export function AppLayout() {
   const navigate = useNavigate();
@@ -28,12 +29,20 @@ export function AppLayout() {
       } catch {
         // Token may be invalid
         navigate("/login", { replace: true });
+        return;
       } finally {
         setInitializing(false);
       }
+
+      // Open the shared WS connection once the session is ready
+      const token = useAuthStore.getState().accessToken;
+      if (token) wsClient.connect(token);
     };
 
     init();
+
+    // Disconnect WS when the layout unmounts (i.e. user logs out)
+    return () => wsClient.disconnect();
   }, []);
 
   if (initializing) {
