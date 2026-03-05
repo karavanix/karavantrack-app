@@ -27,11 +27,9 @@ export function useLoadPositionWS({
     const token = useAuthStore.getState().accessToken;
     if (!token) return;
 
-    // Build WebSocket URL from the API base URL
+    // Build WebSocket URL: swap http→ws, keep /api/v1 prefix (spec: basePath=/api/v1, path=/ws)
     const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1";
-    const wsBase = apiBase
-      .replace(/^http/, "ws")
-      .replace(/\/api\/v1\/?$/, "");
+    const wsBase = apiBase.replace(/^http/, "ws");
     const wsUrl = `${wsBase}/ws?token=${encodeURIComponent(token)}&load_id=${loadId}`;
 
     try {
