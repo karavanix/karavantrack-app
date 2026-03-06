@@ -528,9 +528,14 @@ export default function LoadDetailPage() {
                     <p className="font-medium">
                       {carrier.alias || `${carrier.first_name} ${carrier.last_name}`.trim()}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {carrier.first_name} {carrier.last_name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        {carrier.first_name} {carrier.last_name}
+                      </p>
+                      <Badge variant={carrier.is_free ? "success" : "secondary"} className="text-[10px] px-1.5 py-0">
+                        {carrier.is_free ? "Available" : "Busy"}
+                      </Badge>
+                    </div>
                   </div>
                 </button>
               ))}

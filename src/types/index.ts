@@ -95,6 +95,7 @@ export interface Carrier {
   first_name: string;
   last_name: string;
   alias: string;
+  is_free: boolean;
   created_at: string;
 }
 
@@ -208,9 +209,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface LoadListParams extends PaginationParams {
-  company_id?: string;
-  carrier_id?: string;
-  status?: string;
+  status?: LoadStatus[];
 }
 
 // ──── Dashboard Stats ────

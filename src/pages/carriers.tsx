@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Truck, Plus, Trash2, AlertCircle, Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Carrier, CarrierSearchResult, PaginatedResponse } from "@/types";
 
@@ -143,6 +144,15 @@ export default function CarriersPage() {
         <span>
           {row.original.first_name} {row.original.last_name}
         </span>
+      ),
+    },
+    {
+      id: "status",
+      header: t("carriers_col_status"),
+      cell: ({ row }) => (
+        <Badge variant={row.original.is_free ? "success" : "secondary"}>
+          {row.original.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+        </Badge>
       ),
     },
     {

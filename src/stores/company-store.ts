@@ -24,7 +24,7 @@ export const useCompanyStore = create<CompanyState>()(
       fetchCompanies: async () => {
         set({ isLoading: true });
         try {
-          const { data } = await api.get<Company[]>("/companies/mine");
+          const { data } = await api.get<Company[]>("/companies");
           set({ companies: data });
           // Auto-select first company if none selected
           if (!get().selectedCompanyId && data.length > 0) {

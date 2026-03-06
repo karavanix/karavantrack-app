@@ -38,14 +38,27 @@ export default function DashboardPage() {
     setIsLoading(true);
     setError("");
     try {
-      const loadsParams: Record<string, string | number> = { limit: 100, offset: 0 };
-      if (activeTab !== "all") loadsParams.status = activeTab;
+      const loadsParams: Record<string, string | number | string[]> = { limit: 100, offset: 0 };
+      if (activeTab !== "all") loadsParams.status = [activeTab];
 
       // Fetch loads and stats in parallel from the dedicated stats endpoint
       const [loadsRes, statsRes] = await Promise.all([
         api.get<PaginatedResponse<Load> | Load[]>(
           `/companies/${selectedCompanyId}/loads`,
-          { params: loadsParams }
+          {
+            params: loadsParams,
+            paramsSerializer: (params) => {
+              const parts: string[] = [];
+              for (const [key, val] of Object.entries(params)) {
+                if (Array.isArray(val)) {
+                  val.forEach((v) => parts.push(`${key}=${encodeURIComponent(v)}`));
+                } else {
+                  parts.push(`${key}=${encodeURIComponent(val)}`);
+                }
+              }
+              return parts.join("&");
+            },
+          }
         ),
         api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`),
       ]);

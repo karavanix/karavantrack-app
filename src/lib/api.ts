@@ -108,6 +108,7 @@ export function getApiErrorMessage(error: unknown): string {
     if (error.response?.status === 409) return "This resource already exists";
     if (error.response?.status === 403) return "You don't have permission to do this";
     if (error.response?.status === 404) return "Resource not found";
+    if (error.response?.status === 500) return "Server error. Please try again later.";
   }
   return "Something went wrong. Please try again.";
 }
