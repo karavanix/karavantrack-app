@@ -1,15 +1,20 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { reverseGeocode, formatPhotonFeature } from "@/lib/geocoding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  LocationAutocomplete,
+  type LocationResult,
+} from "@/components/location-autocomplete";
 import { MapPin, ArrowLeft, AlertCircle, Navigation } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -50,6 +55,9 @@ interface LatLng {
   lng: number;
 }
 
+/**
+ * Handles map click events and dispatches to the active mode's handler.
+ */
 function MapClickHandler({
   mode,
   onPickup,
@@ -71,20 +79,52 @@ function MapClickHandler({
   return null;
 }
 
+/**
+ * Flies the map to a position or fits bounds when both points exist.
+ */
+function MapFlyTo({
+  pickup,
+  dropoff,
+  flyTarget,
+}: {
+  pickup: LatLng | null;
+  dropoff: LatLng | null;
+  flyTarget: LatLng | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (pickup && dropoff) {
+      const bounds = L.latLngBounds(
+        [pickup.lat, pickup.lng],
+        [dropoff.lat, dropoff.lng]
+      );
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+    } else if (flyTarget) {
+      map.flyTo([flyTarget.lat, flyTarget.lng], 14, { duration: 0.8 });
+    }
+  }, [pickup, dropoff, flyTarget, map]);
+
+  return null;
+}
+
 export default function CreateLoadPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { selectedCompanyId } = useCompanyStore();
+
   const [form, setForm] = useState({
     title: "",
     description: "",
     reference_id: "",
-    pickup_address: "",
-    dropoff_address: "",
   });
+
   const [pickup, setPickup] = useState<LatLng | null>(null);
   const [dropoff, setDropoff] = useState<LatLng | null>(null);
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [dropoffAddress, setDropoffAddress] = useState("");
   const [mapMode, setMapMode] = useState<"pickup" | "dropoff">("pickup");
+  const [flyTarget, setFlyTarget] = useState<LatLng | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const mapRef = useRef<L.Map | null>(null);
@@ -100,6 +140,51 @@ export default function CreateLoadPage() {
     );
   }, []);
 
+  // ── Reverse geocode on map click ──
+  const handleMapPickup = useCallback(async (pos: LatLng) => {
+    setPickup(pos);
+    setFlyTarget(pos);
+    try {
+      const feature = await reverseGeocode(pos.lat, pos.lng);
+      if (feature) {
+        setPickupAddress(formatPhotonFeature(feature));
+      } else {
+        setPickupAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
+      }
+    } catch {
+      setPickupAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
+    }
+  }, []);
+
+  const handleMapDropoff = useCallback(async (pos: LatLng) => {
+    setDropoff(pos);
+    setFlyTarget(pos);
+    try {
+      const feature = await reverseGeocode(pos.lat, pos.lng);
+      if (feature) {
+        setDropoffAddress(formatPhotonFeature(feature));
+      } else {
+        setDropoffAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
+      }
+    } catch {
+      setDropoffAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
+    }
+  }, []);
+
+  // ── Autocomplete selection ──
+  const handlePickupSelect = useCallback((result: LocationResult) => {
+    setPickup({ lat: result.lat, lng: result.lng });
+    setPickupAddress(result.address);
+    setFlyTarget({ lat: result.lat, lng: result.lng });
+  }, []);
+
+  const handleDropoffSelect = useCallback((result: LocationResult) => {
+    setDropoff({ lat: result.lat, lng: result.lng });
+    setDropoffAddress(result.address);
+    setFlyTarget({ lat: result.lat, lng: result.lng });
+  }, []);
+
+  // ── Submit ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -124,10 +209,10 @@ export default function CreateLoadPage() {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
         reference_id: form.reference_id.trim() || undefined,
-        pickup_address: form.pickup_address.trim() || undefined,
+        pickup_address: pickupAddress.trim() || undefined,
         pickup_lat: pickup.lat,
         pickup_lng: pickup.lng,
-        dropoff_address: form.dropoff_address.trim() || undefined,
+        dropoff_address: dropoffAddress.trim() || undefined,
         dropoff_lat: dropoff.lat,
         dropoff_lng: dropoff.lng,
       });
@@ -204,46 +289,84 @@ export default function CreateLoadPage() {
           </CardContent>
         </Card>
 
-
-        {/* Map */}
+        {/* Locations */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t("create_load_locations_card")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Mode selector */}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={mapMode === "pickup" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setMapMode("pickup")}
-                className="gap-1"
-              >
-                <Navigation size={14} />
-                {t("create_load_set_pickup")}
-                {pickup && " ✓"}
-              </Button>
-              <Button
-                type="button"
-                variant={mapMode === "dropoff" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setMapMode("dropoff")}
-                className="gap-1"
-              >
-                <MapPin size={14} />
-                {t("create_load_set_dropoff")}
-                {dropoff && " ✓"}
-              </Button>
+            {/* Address search inputs */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="pickup-search">{t("create_load_pickup_addr")}</Label>
+                <LocationAutocomplete
+                  id="pickup-search"
+                  placeholder={t("create_load_search_pickup")}
+                  value={pickupAddress}
+                  onSelect={handlePickupSelect}
+                  onFocus={() => setMapMode("pickup")}
+                  biasLat={center.lat}
+                  biasLon={center.lng}
+                />
+                {pickup && (
+                  <p className="text-xs text-muted-foreground">
+                    📍 {pickup.lat.toFixed(5)}, {pickup.lng.toFixed(5)}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dropoff-search">{t("create_load_dropoff_addr")}</Label>
+                <LocationAutocomplete
+                  id="dropoff-search"
+                  placeholder={t("create_load_search_dropoff")}
+                  value={dropoffAddress}
+                  onSelect={handleDropoffSelect}
+                  onFocus={() => setMapMode("dropoff")}
+                  biasLat={center.lat}
+                  biasLon={center.lng}
+                />
+                {dropoff && (
+                  <p className="text-xs text-muted-foreground">
+                    🏁 {dropoff.lat.toFixed(5)}, {dropoff.lng.toFixed(5)}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              {t("create_load_map_hint", {
-                mode: mapMode === "pickup"
-                  ? t("create_load_map_hint_pickup")
-                  : t("create_load_map_hint_dropoff"),
-              })}
-            </p>
+            {/* Mode selector + hint */}
+            <div className="flex items-center gap-3">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={mapMode === "pickup" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setMapMode("pickup")}
+                  className="gap-1"
+                >
+                  <Navigation size={14} />
+                  {t("create_load_set_pickup")}
+                  {pickup && " ✓"}
+                </Button>
+                <Button
+                  type="button"
+                  variant={mapMode === "dropoff" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setMapMode("dropoff")}
+                  className="gap-1"
+                >
+                  <MapPin size={14} />
+                  {t("create_load_set_dropoff")}
+                  {dropoff && " ✓"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("create_load_map_hint", {
+                  mode: mapMode === "pickup"
+                    ? t("create_load_map_hint_pickup")
+                    : t("create_load_map_hint_dropoff"),
+                })}
+              </p>
+            </div>
 
             {/* Map */}
             <div className="h-[350px] overflow-hidden rounded-lg border">
@@ -259,45 +382,23 @@ export default function CreateLoadPage() {
                 />
                 <MapClickHandler
                   mode={mapMode}
-                  onPickup={setPickup}
-                  onDropoff={setDropoff}
+                  onPickup={handleMapPickup}
+                  onDropoff={handleMapDropoff}
+                />
+                <MapFlyTo
+                  pickup={pickup}
+                  dropoff={dropoff}
+                  flyTarget={flyTarget}
                 />
                 {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
                 {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
               </MapContainer>
             </div>
 
-            {/* Address inputs */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="pickup-addr">{t("create_load_pickup_addr")}</Label>
-                <Input
-                  id="pickup-addr"
-                  placeholder={t("create_load_addr_placeholder")}
-                  value={form.pickup_address}
-                  onChange={(e) => update("pickup_address", e.target.value)}
-                />
-                {pickup && (
-                  <p className="text-xs text-muted-foreground">
-                    📍 {pickup.lat.toFixed(5)}, {pickup.lng.toFixed(5)}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dropoff-addr">{t("create_load_dropoff_addr")}</Label>
-                <Input
-                  id="dropoff-addr"
-                  placeholder={t("create_load_addr_placeholder")}
-                  value={form.dropoff_address}
-                  onChange={(e) => update("dropoff_address", e.target.value)}
-                />
-                {dropoff && (
-                  <p className="text-xs text-muted-foreground">
-                    🏁 {dropoff.lat.toFixed(5)}, {dropoff.lng.toFixed(5)}
-                  </p>
-                )}
-              </div>
-            </div>
+            {/* Paste hint */}
+            <p className="text-xs text-muted-foreground text-center">
+              💡 {t("create_load_paste_hint")}
+            </p>
           </CardContent>
         </Card>
 

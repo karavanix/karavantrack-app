@@ -10,4 +10,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/geocoding': {
+        target: 'http://localhost:2322',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/geocoding/, ''),
+      },
+    },
+  },
 })

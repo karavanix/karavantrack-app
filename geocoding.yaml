@@ -1,0 +1,375 @@
+openapi: 3.1.0
+info:
+  title: Photon Geocoding API
+  version: "1.0.0-unofficial"
+  description: |
+    Unofficial OpenAPI spec for komoot/photon, derived from the current API docs.
+    Photon is an open source geocoder for OpenStreetMap data.
+
+servers:
+  - url: http://localhost:2322
+    description: Local Photon instance
+
+tags:
+  - name: Geocoding
+  - name: Reverse
+  - name: Utility
+
+paths:
+  /api:
+    get:
+      tags: [Geocoding]
+      summary: Forward geocoding / autocomplete
+      description: Search places by free-form text.
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Free-form search query.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+          description: Maximum number of results.
+        - in: query
+          name: lat
+          schema:
+            type: number
+            format: double
+          description: Latitude for location bias.
+        - in: query
+          name: lon
+          schema:
+            type: number
+            format: double
+          description: Longitude for location bias.
+        - in: query
+          name: zoom
+          schema:
+            type: integer
+          description: Controls location bias strength.
+        - in: query
+          name: location_bias_scale
+          schema:
+            type: number
+            format: double
+          description: Scale for local bias, typically between 0.0 and 1.0.
+        - in: query
+          name: bbox
+          schema:
+            type: string
+          description: Bounding box as minLon,minLat,maxLon,maxLat.
+          example: "9.5,51.5,11.5,53.5"
+        - in: query
+          name: lang
+          schema:
+            type: string
+          description: Preferred response language.
+        - in: query
+          name: layer
+          schema:
+            type: string
+            enum: [house, street, locality, district, city, county, state, country, other]
+          description: Restrict results to a place layer.
+        - in: query
+          name: osm_tag
+          schema:
+            type: string
+          description: OSM tag filter such as tourism:museum or tourism.
+        - in: query
+          name: dedupe
+          schema:
+            oneOf:
+              - type: integer
+                enum: [0, 1]
+              - type: boolean
+          description: Disable or enable deduplication.
+      responses:
+        "200":
+          description: GeoJSON feature collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotonResponse"
+
+  /structured:
+    get:
+      tags: [Geocoding]
+      summary: Structured geocoding
+      description: Search places using structured address components.
+      parameters:
+        - in: query
+          name: countrycode
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 2
+          description: ISO 3166-1 alpha-2 country code.
+        - in: query
+          name: state
+          schema:
+            type: string
+        - in: query
+          name: county
+          schema:
+            type: string
+        - in: query
+          name: city
+          schema:
+            type: string
+        - in: query
+          name: postcode
+          schema:
+            type: string
+        - in: query
+          name: district
+          schema:
+            type: string
+        - in: query
+          name: housenumber
+          schema:
+            type: string
+        - in: query
+          name: street
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: lat
+          schema:
+            type: number
+            format: double
+        - in: query
+          name: lon
+          schema:
+            type: number
+            format: double
+        - in: query
+          name: zoom
+          schema:
+            type: integer
+        - in: query
+          name: location_bias_scale
+          schema:
+            type: number
+            format: double
+        - in: query
+          name: bbox
+          schema:
+            type: string
+        - in: query
+          name: lang
+          schema:
+            type: string
+        - in: query
+          name: layer
+          schema:
+            type: string
+            enum: [house, street, locality, district, city, county, state, country, other]
+        - in: query
+          name: osm_tag
+          schema:
+            type: string
+        - in: query
+          name: dedupe
+          schema:
+            oneOf:
+              - type: integer
+                enum: [0, 1]
+              - type: boolean
+      responses:
+        "200":
+          description: GeoJSON feature collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotonResponse"
+
+  /reverse:
+    get:
+      tags: [Reverse]
+      summary: Reverse geocoding
+      description: Find nearby address or place from coordinates.
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+            format: double
+        - in: query
+          name: lon
+          required: true
+          schema:
+            type: number
+            format: double
+        - in: query
+          name: radius
+          schema:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 5000
+          description: Search radius in kilometers.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: lang
+          schema:
+            type: string
+        - in: query
+          name: osm_tag
+          schema:
+            type: string
+        - in: query
+          name: layer
+          schema:
+            type: string
+            enum: [house, street, locality, district, city, county, state, country, other]
+      responses:
+        "200":
+          description: GeoJSON feature collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotonResponse"
+
+  /status:
+    get:
+      tags: [Utility]
+      summary: Server status
+      description: Returns server status and data update information.
+      responses:
+        "200":
+          description: Status response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                example:
+                  status: OK
+                  version: "0.7.2"
+                  data:
+                    date: "2026-02-28"
+
+  /update:
+    get:
+      tags: [Utility]
+      summary: Trigger update
+      description: Optional endpoint, only available if update support is enabled on the server.
+      responses:
+        "200":
+          description: Update triggered or status returned
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /metrics:
+    get:
+      tags: [Utility]
+      summary: Metrics
+      description: Optional metrics endpoint.
+      responses:
+        "200":
+          description: Metrics output
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    PhotonResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: FeatureCollection
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/PhotonFeature"
+      required: [features]
+
+    PhotonFeature:
+      type: object
+      properties:
+        type:
+          type: string
+          example: Feature
+        geometry:
+          $ref: "#/components/schemas/Geometry"
+        properties:
+          $ref: "#/components/schemas/PhotonProperties"
+      required: [type, geometry, properties]
+
+    Geometry:
+      type: object
+      properties:
+        type:
+          type: string
+          example: Point
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+            format: double
+          example: [13.3888599, 52.5170365]
+      required: [type, coordinates]
+
+    PhotonProperties:
+      type: object
+      properties:
+        name:
+          type: string
+        country:
+          type: string
+        countrycode:
+          type: string
+        state:
+          type: string
+        county:
+          type: string
+        city:
+          type: string
+        district:
+          type: string
+        street:
+          type: string
+        housenumber:
+          type: string
+        postcode:
+          type: string
+        osm_key:
+          type: string
+        osm_value:
+          type: string
+        osm_type:
+          type: string
+          description: OSM object type, e.g. N/W/R
+        osm_id:
+          type: integer
+        extent:
+          type: array
+          items:
+            type: number
+            format: double
+          minItems: 4
+          maxItems: 4
+        extra:
+          type: object
+          additionalProperties: true
