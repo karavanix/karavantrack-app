@@ -375,10 +375,15 @@ export default function CreateLoadPage() {
                 zoom={12}
                 className="h-full w-full"
                 ref={mapRef}
+                preferCanvas={true}
               >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  updateWhenZooming={false}
+                  updateWhenIdle={true}
+                  keepBuffer={4}
+                  detectRetina={false}
                 />
                 <MapClickHandler
                   mode={mapMode}
