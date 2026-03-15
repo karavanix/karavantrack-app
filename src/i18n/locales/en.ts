@@ -272,6 +272,7 @@ const en = {
   common_save: "Save",
   common_remove: "Remove",
   common_loading: "Loading...",
+  common_reload: "Reload",
   common_error: "Something went wrong",
 };
 

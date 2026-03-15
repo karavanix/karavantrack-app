@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
-import { Package, Plus, Building2, Eye } from "lucide-react";
+import { Package, Plus, Building2, Eye, RefreshCw } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Load, LoadStats, PaginatedResponse } from "@/types";
 
@@ -204,13 +204,26 @@ export default function DashboardPage() {
 
       {/* Loads table with tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap">
-          {STATUS_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="flex items-center justify-between mb-4">
+          <TabsList className="flex-wrap">
+            {STATUS_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchData} 
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+            {t("common_reload", "Reload")}
+          </Button>
+        </div>
 
         {STATUS_TABS.map((tab) => (
           <TabsContent key={tab.value} value={tab.value}>

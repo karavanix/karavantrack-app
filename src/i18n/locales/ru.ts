@@ -269,6 +269,7 @@ const ru = {
   common_save: "Сохранить",
   common_remove: "Удалить",
   common_loading: "Загрузка...",
+  common_reload: "Обновить",
   common_error: "Что-то пошло не так",
 };
 

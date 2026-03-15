@@ -242,6 +242,7 @@ const uz = {
   common_save: "Saqlash",
   common_remove: "O'chirish",
   common_loading: "Yuklanmoqda...",
+  common_reload: "Yangilash",
   common_error: "Xatolik yuz berdi",
 };
 
