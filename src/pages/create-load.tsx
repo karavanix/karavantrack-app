@@ -13,10 +13,11 @@ import {
   LocationAutocomplete,
   type LocationResult,
 } from "@/components/location-autocomplete";
-import { MapPin, ArrowLeft, AlertCircle, Navigation } from "lucide-react";
+import { MapPin, ArrowLeft, AlertCircle, Navigation, Search, Truck } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import type { Carrier } from "@/types";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -55,9 +56,6 @@ interface LatLng {
   lng: number;
 }
 
-/**
- * Handles map click events and dispatches to the active mode's handler.
- */
 function MapClickHandler({
   mode,
   onPickup,
@@ -79,9 +77,6 @@ function MapClickHandler({
   return null;
 }
 
-/**
- * Flies the map to a position or fits bounds when both points exist.
- */
 function MapFlyTo({
   pickup,
   dropoff,
@@ -111,12 +106,14 @@ function MapFlyTo({
 export default function CreateLoadPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { selectedCompanyId } = useCompanyStore();
+  const { selectedCompanyId, hasPermission } = useCompanyStore();
 
   const [form, setForm] = useState({
     title: "",
     description: "",
     reference_id: "",
+    pickup_at: "",
+    dropoff_at: "",
   });
 
   const [pickup, setPickup] = useState<LatLng | null>(null);
@@ -129,6 +126,13 @@ export default function CreateLoadPage() {
   const [error, setError] = useState("");
   const mapRef = useRef<L.Map | null>(null);
 
+  // ── Carrier selection state ──
+  const [carrierQuery, setCarrierQuery] = useState("");
+  const [carrierResults, setCarrierResults] = useState<Carrier[]>([]);
+  const [carrierSearching, setCarrierSearching] = useState(false);
+  const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
+  const carrierTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -140,17 +144,40 @@ export default function CreateLoadPage() {
     );
   }, []);
 
-  // ── Reverse geocode on map click ──
+  // ── Carrier search ──
+  const handleCarrierSearch = (value: string) => {
+    setCarrierQuery(value);
+    if (!value.trim()) {
+      setSelectedCarrier(null);
+    }
+    if (carrierTimer.current) clearTimeout(carrierTimer.current);
+    if (value.trim().length < 2) {
+      setCarrierResults([]);
+      return;
+    }
+    carrierTimer.current = setTimeout(async () => {
+      if (!selectedCompanyId) return;
+      setCarrierSearching(true);
+      try {
+        const { data } = await api.get<Carrier[]>(`/companies/${selectedCompanyId}/carriers`, {
+          params: { q: value.trim() },
+        });
+        setCarrierResults(Array.isArray(data) ? data : []);
+      } catch {
+        setCarrierResults([]);
+      } finally {
+        setCarrierSearching(false);
+      }
+    }, 300);
+  };
+
+  // ── Map helpers ──
   const handleMapPickup = useCallback(async (pos: LatLng) => {
     setPickup(pos);
     setFlyTarget(pos);
     try {
       const feature = await reverseGeocode(pos.lat, pos.lng);
-      if (feature) {
-        setPickupAddress(formatPhotonFeature(feature));
-      } else {
-        setPickupAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
-      }
+      setPickupAddress(feature ? formatPhotonFeature(feature) : `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
     } catch {
       setPickupAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
     }
@@ -161,17 +188,12 @@ export default function CreateLoadPage() {
     setFlyTarget(pos);
     try {
       const feature = await reverseGeocode(pos.lat, pos.lng);
-      if (feature) {
-        setDropoffAddress(formatPhotonFeature(feature));
-      } else {
-        setDropoffAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
-      }
+      setDropoffAddress(feature ? formatPhotonFeature(feature) : `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
     } catch {
       setDropoffAddress(`${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
     }
   }, []);
 
-  // ── Autocomplete selection ──
   const handlePickupSelect = useCallback((result: LocationResult) => {
     setPickup({ lat: result.lat, lng: result.lng });
     setPickupAddress(result.address);
@@ -212,9 +234,12 @@ export default function CreateLoadPage() {
         pickup_address: pickupAddress.trim() || undefined,
         pickup_lat: pickup.lat,
         pickup_lng: pickup.lng,
+        pickup_at: form.pickup_at || undefined,
         dropoff_address: dropoffAddress.trim() || undefined,
         dropoff_lat: dropoff.lat,
         dropoff_lng: dropoff.lng,
+        dropoff_at: form.dropoff_at || undefined,
+        carrier_id: selectedCarrier?.carrier_id || undefined,
       });
       navigate(`/loads/${data.id}`, { replace: true });
     } catch (err) {
@@ -223,6 +248,9 @@ export default function CreateLoadPage() {
       setIsLoading(false);
     }
   };
+
+  const canCreate = hasPermission("company.load.create");
+  const canAssignCarrier = hasPermission("company.carrier.read");
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -235,6 +263,13 @@ export default function CreateLoadPage() {
         <h1 className="text-2xl font-bold tracking-tight">{t("create_load_title")}</h1>
         <p className="text-sm text-muted-foreground">{t("create_load_subtitle")}</p>
       </div>
+
+      {!canCreate && (
+        <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle size={16} className="shrink-0" />
+          {t("create_load_no_permission")}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
@@ -261,6 +296,7 @@ export default function CreateLoadPage() {
                 minLength={2}
                 maxLength={255}
                 autoFocus
+                disabled={!canCreate}
               />
             </div>
             <div className="space-y-2">
@@ -274,6 +310,7 @@ export default function CreateLoadPage() {
                 value={form.reference_id}
                 onChange={(e) => update("reference_id", e.target.value)}
                 maxLength={100}
+                disabled={!canCreate}
               />
             </div>
             <div className="space-y-2">
@@ -283,11 +320,138 @@ export default function CreateLoadPage() {
                 placeholder={t("create_load_desc_placeholder")}
                 value={form.description}
                 onChange={(e) => update("description", e.target.value)}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
+                disabled={!canCreate}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </CardContent>
         </Card>
+
+        {/* Schedule */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("create_load_schedule_card")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="pickup-at">
+                  {t("create_load_pickup_at")}{" "}
+                  <span className="text-xs text-muted-foreground">{t("register_phone_optional")}</span>
+                </Label>
+                <Input
+                  id="pickup-at"
+                  type="datetime-local"
+                  value={form.pickup_at}
+                  onChange={(e) => update("pickup_at", e.target.value)}
+                  disabled={!canCreate}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dropoff-at">
+                  {t("create_load_dropoff_at")}{" "}
+                  <span className="text-xs text-muted-foreground">{t("register_phone_optional")}</span>
+                </Label>
+                <Input
+                  id="dropoff-at"
+                  type="datetime-local"
+                  value={form.dropoff_at}
+                  onChange={(e) => update("dropoff_at", e.target.value)}
+                  disabled={!canCreate}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Carrier assignment */}
+        {canAssignCarrier && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t("create_load_carrier_card")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">{t("create_load_carrier_hint")}</p>
+
+              {selectedCarrier ? (
+                <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                    <Truck size={14} />
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="font-medium text-sm truncate">
+                      {selectedCarrier.alias || `${selectedCarrier.first_name} ${selectedCarrier.last_name}`.trim()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedCarrier.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCarrier(null);
+                      setCarrierQuery("");
+                      setCarrierResults([]);
+                    }}
+                    className="text-muted-foreground"
+                  >
+                    {t("create_load_carrier_clear")}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder={t("create_load_carrier_search")}
+                      value={carrierQuery}
+                      onChange={(e) => handleCarrierSearch(e.target.value)}
+                      className="pl-9"
+                      disabled={!canCreate}
+                    />
+                  </div>
+
+                  {carrierSearching && (
+                    <div className="flex justify-center py-3">
+                      <Spinner size={18} />
+                    </div>
+                  )}
+
+                  {!carrierSearching && carrierResults.length > 0 && (
+                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-1">
+                      {carrierResults.map((c) => (
+                        <button
+                          key={c.carrier_id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCarrier(c);
+                            setCarrierQuery(c.alias || `${c.first_name} ${c.last_name}`.trim());
+                            setCarrierResults([]);
+                          }}
+                          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+                        >
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold shrink-0">
+                            {c.first_name?.[0]}{c.last_name?.[0]}
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <p className="font-medium truncate">
+                              {c.alias || `${c.first_name} ${c.last_name}`.trim()}
+                            </p>
+                          </div>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${c.is_free ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}`}>
+                            {c.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Locations */}
         <Card>
@@ -400,7 +564,6 @@ export default function CreateLoadPage() {
               </MapContainer>
             </div>
 
-            {/* Paste hint */}
             <p className="text-xs text-muted-foreground text-center">
               💡 {t("create_load_paste_hint")}
             </p>
@@ -412,7 +575,7 @@ export default function CreateLoadPage() {
           <Button type="button" variant="outline" onClick={() => navigate(-1)}>
             {t("create_load_cancel")}
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading || !canCreate}>
             {isLoading ? (
               <>
                 <Spinner size={16} className="text-primary-foreground" />

@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useCompanyStore } from "@/stores/company-store";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -18,15 +19,21 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation();
   const { t } = useTranslation();
+  const { hasPermission } = useCompanyStore();
 
-  const navigation = [
-    { name: t("nav_dashboard"), href: "/", icon: LayoutDashboard },
-    { name: t("nav_loads"), href: "/loads", icon: Package },
-    { name: t("nav_carriers"), href: "/carriers", icon: TruckIcon },
-    { name: t("nav_members"), href: "/members", icon: Users },
-    { name: t("nav_company"), href: "/company", icon: Building2 },
-    { name: t("nav_settings"), href: "/settings", icon: Settings },
+  const allNavItems = [
+    { name: t("nav_dashboard"), href: "/", icon: LayoutDashboard, permission: null },
+    { name: t("nav_loads"), href: "/loads", icon: Package, permission: "company.load.read" as const },
+    { name: t("nav_carriers"), href: "/carriers", icon: TruckIcon, permission: "company.carrier.read" as const },
+    { name: t("nav_members"), href: "/members", icon: Users, permission: "company.member.read" as const },
+    { name: t("nav_company"), href: "/company", icon: Building2, permission: null },
+    { name: t("nav_settings"), href: "/settings", icon: Settings, permission: null },
   ];
+
+  // Filter nav items based on permissions (items with null permission are always shown)
+  const navigation = allNavItems.filter(
+    (item) => item.permission === null || hasPermission(item.permission)
+  );
 
   return (
     <>

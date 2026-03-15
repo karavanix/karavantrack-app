@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api } from "@/lib/api";
-import type { Company, CreateCompanyRequest, CreateCompanyResponse } from "@/types";
+import type { Company, CompanyPermission, CreateCompanyRequest, CreateCompanyResponse } from "@/types";
 
 interface CompanyState {
   companies: Company[];
@@ -12,6 +12,7 @@ interface CompanyState {
   createCompany: (req: CreateCompanyRequest) => Promise<CreateCompanyResponse>;
   selectCompany: (id: string) => void;
   selectedCompany: () => Company | undefined;
+  hasPermission: (permission: CompanyPermission) => boolean;
 }
 
 export const useCompanyStore = create<CompanyState>()(
@@ -47,6 +48,13 @@ export const useCompanyStore = create<CompanyState>()(
       selectedCompany: () => {
         const { companies, selectedCompanyId } = get();
         return companies.find((c) => c.id === selectedCompanyId);
+      },
+
+      hasPermission: (permission: CompanyPermission) => {
+        const { companies, selectedCompanyId } = get();
+        const company = companies.find((c) => c.id === selectedCompanyId);
+        if (!company) return false;
+        return company.permissions?.includes(permission) ?? false;
       },
     }),
     {
