@@ -13,11 +13,11 @@ import {
   LocationAutocomplete,
   type LocationResult,
 } from "@/components/location-autocomplete";
-import { MapPin, ArrowLeft, AlertCircle, Navigation, Search, Truck } from "lucide-react";
+import { MapPin, ArrowLeft, AlertCircle, Navigation, Search, Truck, Mail } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Carrier } from "@/types";
+import type { Carrier, GetCarrierByContactResponse } from "@/types";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -126,12 +126,34 @@ export default function CreateLoadPage() {
   const [error, setError] = useState("");
   const mapRef = useRef<L.Map | null>(null);
 
-  // ── Carrier selection state ──
+  // ── Carrier selection state (three-tier) ──
+  // Tier 1: search within my carriers
   const [carrierQuery, setCarrierQuery] = useState("");
   const [carrierResults, setCarrierResults] = useState<Carrier[]>([]);
   const [carrierSearching, setCarrierSearching] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
   const carrierTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // Tier 2: by-contact lookup
+  const [carrierContact, setCarrierContact] = useState("");
+  const [carrierContactResult, setCarrierContactResult] = useState<GetCarrierByContactResponse | null>(null);
+  const [carrierContactSearching, setCarrierContactSearching] = useState(false);
+  const [carrierContactNotFound, setCarrierContactNotFound] = useState(false);
+  const [carrierContactSelected, setCarrierContactSelected] = useState<GetCarrierByContactResponse | null>(null);
+
+  // Tier 3: invite
+  const [carrierInviteLoading, setCarrierInviteLoading] = useState(false);
+  const [carrierInviteDone, setCarrierInviteDone] = useState(false);
+  const [carrierInviteError, setCarrierInviteError] = useState("");
+
+  // Active picked carrier (from either tier 1 or tier 2)
+  const pickedCarrierId = selectedCarrier?.carrier_id ?? carrierContactSelected?.id ?? null;
+  const pickedCarrierLabel = selectedCarrier
+    ? selectedCarrier.alias || `${selectedCarrier.first_name} ${selectedCarrier.last_name}`.trim()
+    : carrierContactSelected
+    ? `${carrierContactSelected.first_name} ${carrierContactSelected.last_name}`.trim()
+    : null;
+  const pickedCarrierFree = selectedCarrier?.is_free ?? true;
 
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -144,17 +166,15 @@ export default function CreateLoadPage() {
     );
   }, []);
 
-  // ── Carrier search ──
+  // ── Tier 1: search within my carriers ──
   const handleCarrierSearch = (value: string) => {
     setCarrierQuery(value);
     if (!value.trim()) {
-      setSelectedCarrier(null);
-    }
-    if (carrierTimer.current) clearTimeout(carrierTimer.current);
-    if (value.trim().length < 2) {
       setCarrierResults([]);
       return;
     }
+    if (carrierTimer.current) clearTimeout(carrierTimer.current);
+    if (value.trim().length < 2) { setCarrierResults([]); return; }
     carrierTimer.current = setTimeout(async () => {
       if (!selectedCompanyId) return;
       setCarrierSearching(true);
@@ -163,12 +183,53 @@ export default function CreateLoadPage() {
           params: { q: value.trim() },
         });
         setCarrierResults(Array.isArray(data) ? data : []);
-      } catch {
-        setCarrierResults([]);
-      } finally {
-        setCarrierSearching(false);
-      }
+      } catch { setCarrierResults([]); } finally { setCarrierSearching(false); }
     }, 300);
+  };
+
+  // ── Tier 2: by-contact lookup ──
+  const handleCarrierContactSearch = async () => {
+    const c = carrierContact.trim();
+    if (!c) return;
+    setCarrierContactSearching(true);
+    setCarrierContactResult(null);
+    setCarrierContactNotFound(false);
+    setCarrierContactSelected(null);
+    try {
+      const { data } = await api.get<GetCarrierByContactResponse[]>("/users/carriers/by-contact", {
+        params: { contact: c },
+      });
+      const results = Array.isArray(data) ? data : [];
+      if (results.length > 0) {
+        setCarrierContactResult(results[0]);
+        setCarrierContactSelected(results[0]);
+      } else { setCarrierContactNotFound(true); }
+    } catch { setCarrierContactNotFound(true); }
+    finally { setCarrierContactSearching(false); }
+  };
+
+  // ── Tier 3: invite ──
+  const handleCarrierInvite = async () => {
+    setCarrierInviteLoading(true);
+    setCarrierInviteError("");
+    try {
+      await api.post("/users/invite", { contact: carrierContact.trim(), role: "carrier" });
+      setCarrierInviteDone(true);
+    } catch (err) {
+      setCarrierInviteError(getApiErrorMessage(err));
+    } finally { setCarrierInviteLoading(false); }
+  };
+
+  const clearCarrierPicker = () => {
+    setSelectedCarrier(null);
+    setCarrierQuery("");
+    setCarrierResults([]);
+    setCarrierContact("");
+    setCarrierContactResult(null);
+    setCarrierContactNotFound(false);
+    setCarrierContactSelected(null);
+    setCarrierInviteDone(false);
+    setCarrierInviteError("");
   };
 
   // ── Map helpers ──
@@ -239,7 +300,7 @@ export default function CreateLoadPage() {
         dropoff_lat: dropoff.lat,
         dropoff_lng: dropoff.lng,
         dropoff_at: form.dropoff_at || undefined,
-        carrier_id: selectedCarrier?.carrier_id || undefined,
+        carrier_id: pickedCarrierId || undefined,
       });
       navigate(`/loads/${data.id}`, { replace: true });
     } catch (err) {
@@ -364,7 +425,7 @@ export default function CreateLoadPage() {
           </CardContent>
         </Card>
 
-        {/* Carrier assignment */}
+        {/* ── Assign Carrier (three-tier) ── */}
         {canAssignCarrier && (
           <Card>
             <CardHeader>
@@ -373,78 +434,132 @@ export default function CreateLoadPage() {
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">{t("create_load_carrier_hint")}</p>
 
-              {selectedCarrier ? (
+              {/* Picked carrier display */}
+              {pickedCarrierId ? (
                 <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
                     <Truck size={14} />
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <p className="font-medium text-sm truncate">
-                      {selectedCarrier.alias || `${selectedCarrier.first_name} ${selectedCarrier.last_name}`.trim()}
-                    </p>
+                    <p className="font-medium text-sm truncate">{pickedCarrierLabel}</p>
                     <p className="text-xs text-muted-foreground">
-                      {selectedCarrier.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+                      {pickedCarrierFree ? t("carriers_status_available") : t("carriers_status_busy")}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedCarrier(null);
-                      setCarrierQuery("");
-                      setCarrierResults([]);
-                    }}
-                    className="text-muted-foreground"
-                  >
+                  <Button type="button" variant="ghost" size="sm" onClick={clearCarrierPicker} className="text-muted-foreground">
                     {t("create_load_carrier_clear")}
                   </Button>
                 </div>
               ) : (
                 <>
-                  <div className="relative">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder={t("create_load_carrier_search")}
-                      value={carrierQuery}
-                      onChange={(e) => handleCarrierSearch(e.target.value)}
-                      className="pl-9"
-                      disabled={!canCreate}
-                    />
-                  </div>
-
-                  {carrierSearching && (
-                    <div className="flex justify-center py-3">
-                      <Spinner size={18} />
+                  {/* Tier 1: search within my carriers */}
+                  {!carrierInviteDone && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">{t("create_load_carrier_search_own")}</Label>
+                      <div className="relative">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder={t("create_load_carrier_search")}
+                          value={carrierQuery}
+                          onChange={(e) => handleCarrierSearch(e.target.value)}
+                          className="pl-9"
+                          disabled={!canCreate}
+                        />
+                      </div>
+                      {carrierSearching && <div className="flex justify-center py-2"><Spinner size={16} /></div>}
+                      {!carrierSearching && carrierResults.length > 0 && (
+                        <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border p-1">
+                          {carrierResults.map((c) => (
+                            <button
+                              key={c.carrier_id}
+                              type="button"
+                              onClick={() => { setSelectedCarrier(c); setCarrierQuery(c.alias || `${c.first_name} ${c.last_name}`.trim()); setCarrierResults([]); }}
+                              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+                            >
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold shrink-0">
+                                {c.first_name?.[0]}{c.last_name?.[0]}
+                              </div>
+                              <div className="flex-1 overflow-hidden">
+                                <p className="font-medium truncate">{c.alias || `${c.first_name} ${c.last_name}`.trim()}</p>
+                              </div>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                c.is_free ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
+                              }`}>
+                                {c.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {!carrierSearching && carrierResults.length > 0 && (
-                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-1">
-                      {carrierResults.map((c) => (
-                        <button
-                          key={c.carrier_id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCarrier(c);
-                            setCarrierQuery(c.alias || `${c.first_name} ${c.last_name}`.trim());
-                            setCarrierResults([]);
+                  {/* Divider + Tier 2: by-contact */}
+                  {!carrierInviteDone && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">{t("create_load_carrier_contact_label")}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder={t("carriers_contact_placeholder")}
+                          value={carrierContact}
+                          onChange={(e) => {
+                            setCarrierContact(e.target.value);
+                            setCarrierContactResult(null);
+                            setCarrierContactNotFound(false);
+                            setCarrierContactSelected(null);
                           }}
-                          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+                          onKeyDown={(e) => e.key === "Enter" && handleCarrierContactSearch()}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCarrierContactSearch}
+                          disabled={!carrierContact.trim() || carrierContactSearching}
                         >
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold shrink-0">
-                            {c.first_name?.[0]}{c.last_name?.[0]}
-                          </div>
-                          <div className="flex-1 overflow-hidden">
-                            <p className="font-medium truncate">
-                              {c.alias || `${c.first_name} ${c.last_name}`.trim()}
-                            </p>
-                          </div>
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${c.is_free ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}`}>
-                            {c.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
-                          </span>
-                        </button>
-                      ))}
+                          {carrierContactSearching ? <Spinner size={16} /> : <Search size={16} />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* By-contact result */}
+                  {carrierContactResult && !carrierContactSelected && (
+                    <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                        {carrierContactResult.first_name?.[0]}{carrierContactResult.last_name?.[0]}
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <p className="font-medium text-sm truncate">{carrierContactResult.first_name} {carrierContactResult.last_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{carrierContactResult.email || carrierContactResult.phone}</p>
+                      </div>
+                      <Button type="button" size="sm" onClick={() => setCarrierContactSelected(carrierContactResult)}>
+                        {t("create_load_carrier_select")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Not found → invite */}
+                  {carrierContactNotFound && !carrierInviteDone && (
+                    <div className="rounded-lg border border-dashed p-3 text-center space-y-2">
+                      <p className="text-xs text-muted-foreground">{t("carriers_not_found")}</p>
+                      {carrierInviteError && <p className="text-xs text-destructive">{carrierInviteError}</p>}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCarrierInvite}
+                        disabled={carrierInviteLoading}
+                        className="gap-2"
+                      >
+                        {carrierInviteLoading ? <Spinner size={14} /> : <Mail size={14} />}
+                        {t("carriers_invite")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {carrierInviteDone && (
+                    <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-2.5 text-xs text-green-700 dark:text-green-400">
+                      {t("carriers_invite_sent")}
                     </div>
                   )}
                 </>

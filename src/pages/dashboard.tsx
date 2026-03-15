@@ -74,6 +74,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
+    // Auto-reload every 60 seconds
+    const interval = setInterval(fetchData, 60_000);
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   const columns: ColumnDef<Load>[] = [

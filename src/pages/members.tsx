@@ -33,8 +33,6 @@ import { Users, Plus, Trash2, AlertCircle, Search, Mail } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Member, GetShipperByContactResponse } from "@/types";
 
-type SearchTab = "my-members" | "by-contact";
-
 export default function MembersPage() {
   const { selectedCompanyId, hasPermission } = useCompanyStore();
   const { t } = useTranslation();
@@ -42,39 +40,31 @@ export default function MembersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ── Table search ──
+  // Table search
   const [tableSearch, setTableSearch] = useState("");
   const tableSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // ── Add dialog state ──
+  // Add dialog state
   const [addOpen, setAddOpen] = useState(false);
-  const [searchTab, setSearchTab] = useState<SearchTab>("my-members");
 
-  // -- Tier 1: my members --
-  const [myQuery, setMyQuery] = useState("");
-  const [myResults, setMyResults] = useState<Member[]>([]);
-  const [mySearching, setMySearching] = useState(false);
-  const [selectedMyMember, setSelectedMyMember] = useState<Member | null>(null);
-  const myTimer = useRef<ReturnType<typeof setTimeout>>(null);
-
-  // -- Tier 2: by contact --
+  // By-contact
   const [contact, setContact] = useState("");
   const [contactResult, setContactResult] = useState<GetShipperByContactResponse | null>(null);
   const [contactSearching, setContactSearching] = useState(false);
   const [contactNotFound, setContactNotFound] = useState(false);
   const [selectedContact, setSelectedContact] = useState<GetShipperByContactResponse | null>(null);
 
-  // -- Invite --
+  // Invite
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteDone, setInviteDone] = useState(false);
 
-  // -- Alias, role & submit --
+  // Alias, role & submit
   const [alias, setAlias] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState("");
 
-  // ── Fetch member list ──
+  // Fetch member list
   const fetchMembers = useCallback(
     async (q?: string) => {
       if (!selectedCompanyId) return;
@@ -93,42 +83,15 @@ export default function MembersPage() {
     [selectedCompanyId]
   );
 
-  useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
+  useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
-  // ── Table search ──
   const handleTableSearch = (value: string) => {
     setTableSearch(value);
     if (tableSearchTimer.current) clearTimeout(tableSearchTimer.current);
     tableSearchTimer.current = setTimeout(() => fetchMembers(value.trim() || undefined), 350);
   };
 
-  // ── Dialog tier-1: search within my members ──
-  const handleMyQuery = (value: string) => {
-    setMyQuery(value);
-    setSelectedMyMember(null);
-    if (myTimer.current) clearTimeout(myTimer.current);
-    if (value.trim().length < 2) {
-      setMyResults([]);
-      return;
-    }
-    myTimer.current = setTimeout(async () => {
-      setMySearching(true);
-      try {
-        const { data } = await api.get<Member[]>(`/companies/${selectedCompanyId}/members`, {
-          params: { q: value.trim() },
-        });
-        setMyResults(Array.isArray(data) ? data : []);
-      } catch {
-        setMyResults([]);
-      } finally {
-        setMySearching(false);
-      }
-    }, 300);
-  };
-
-  // ── Dialog tier-2: lookup by contact ──
+  // By-contact lookup
   const handleContactSearch = async () => {
     const c = contact.trim();
     if (!c) return;
@@ -143,6 +106,8 @@ export default function MembersPage() {
       const results = Array.isArray(data) ? data : [];
       if (results.length > 0) {
         setContactResult(results[0]);
+        setSelectedContact(results[0]);
+        setAlias(`${results[0].first_name} ${results[0].last_name}`.trim());
       } else {
         setContactNotFound(true);
       }
@@ -153,7 +118,7 @@ export default function MembersPage() {
     }
   };
 
-  // ── Invite ──
+  // Invite
   const handleInvite = async () => {
     setInviteLoading(true);
     setAddError("");
@@ -167,25 +132,15 @@ export default function MembersPage() {
     }
   };
 
-  // ── Determine the selected result ──
-  const activeSelection: { id: string; first_name: string; last_name: string } | null =
-    searchTab === "my-members"
-      ? selectedMyMember
-        ? { id: selectedMyMember.member_id, first_name: selectedMyMember.first_name, last_name: selectedMyMember.last_name }
-        : null
-      : selectedContact
-      ? { id: selectedContact.id, first_name: selectedContact.first_name, last_name: selectedContact.last_name }
-      : null;
-
-  // ── Add member ──
+  // Add member
   const handleAddMember = async () => {
-    if (!activeSelection || !selectedCompanyId) return;
+    if (!selectedContact || !selectedCompanyId) return;
     setAddError("");
     setAddLoading(true);
     try {
       await api.post(`/companies/${selectedCompanyId}/members`, {
-        user_id: activeSelection.id,
-        alias: alias.trim() || `${activeSelection.first_name} ${activeSelection.last_name}`.trim(),
+        user_id: selectedContact.id,
+        alias: alias.trim() || `${selectedContact.first_name} ${selectedContact.last_name}`.trim(),
         role,
       });
       setAddOpen(false);
@@ -199,10 +154,6 @@ export default function MembersPage() {
   };
 
   const resetAddForm = () => {
-    setSearchTab("my-members");
-    setMyQuery("");
-    setMyResults([]);
-    setSelectedMyMember(null);
     setContact("");
     setContactResult(null);
     setContactNotFound(false);
@@ -222,56 +173,40 @@ export default function MembersPage() {
     }
   };
 
-  // ── Permissions ──
   const canCreateMember = hasPermission("company.member.create.member");
   const canCreateAdmin = hasPermission("company.member.create.admin");
   const canCreate = canCreateMember || canCreateAdmin;
   const canDeleteMember = hasPermission("company.member.delete.member");
   const canDeleteAdmin = hasPermission("company.member.delete.admin");
-
-  const canDeleteRow = (row: Member) => {
-    if (row.role === "admin") return canDeleteAdmin;
-    return canDeleteMember;
-  };
+  const canDeleteRow = (row: Member) => row.role === "admin" ? canDeleteAdmin : canDeleteMember;
 
   const columns: ColumnDef<Member>[] = [
     {
       accessorKey: "alias",
       header: t("members_col_alias"),
-      cell: ({ row }) => (
-        <span className="font-medium">{row.original.alias || "—"}</span>
-      ),
+      cell: ({ row }) => <span className="font-medium">{row.original.alias || "—"}</span>,
     },
     {
       id: "name",
       header: t("members_col_name"),
-      cell: ({ row }) => (
-        <span>{row.original.first_name} {row.original.last_name}</span>
-      ),
+      cell: ({ row }) => <span>{row.original.first_name} {row.original.last_name}</span>,
     },
     {
       accessorKey: "member_id",
       header: t("members_col_user_id"),
-      cell: ({ row }) => (
-        <code className="text-xs text-muted-foreground">{row.original.member_id}</code>
-      ),
+      cell: ({ row }) => <code className="text-xs text-muted-foreground">{row.original.member_id}</code>,
     },
     {
       accessorKey: "role",
       header: t("members_col_role"),
       cell: ({ row }) => (
-        <Badge variant={row.original.role === "admin" ? "default" : "secondary"}>
-          {row.original.role}
-        </Badge>
+        <Badge variant={row.original.role === "admin" ? "default" : "secondary"}>{row.original.role}</Badge>
       ),
     },
     {
       accessorKey: "created_at",
       header: t("members_col_joined"),
-      cell: ({ row }) =>
-        row.original.created_at
-          ? new Date(row.original.created_at).toLocaleDateString()
-          : "—",
+      cell: ({ row }) => row.original.created_at ? new Date(row.original.created_at).toLocaleDateString() : "—",
     },
     {
       id: "actions",
@@ -324,7 +259,6 @@ export default function MembersPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Table-level search */}
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -336,210 +270,89 @@ export default function MembersPage() {
           </div>
 
           {canCreate && (
-            <Dialog
-              open={addOpen}
-              onOpenChange={(open) => {
-                setAddOpen(open);
-                if (!open) resetAddForm();
-              }}
-            >
+            <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) resetAddForm(); }}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus size={16} />
-                  {t("members_add")}
-                </Button>
+                <Button><Plus size={16} />{t("members_add")}</Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>{t("members_dialog_title")}</DialogTitle>
-                  <DialogDescription>{t("members_dialog_desc")}</DialogDescription>
+                  <DialogDescription>{t("members_contact_hint")}</DialogDescription>
                 </DialogHeader>
 
                 {addError && (
                   <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                    <AlertCircle size={16} className="shrink-0" />
-                    {addError}
+                    <AlertCircle size={16} className="shrink-0" />{addError}
                   </div>
                 )}
 
-                {/* Tab switcher */}
-                <div className="flex rounded-lg border overflow-hidden text-sm">
-                  <button
-                    type="button"
-                    onClick={() => setSearchTab("my-members")}
-                    className={`flex-1 py-2 px-3 transition-colors ${
-                      searchTab === "my-members"
-                        ? "bg-primary text-primary-foreground font-medium"
-                        : "hover:bg-muted"
-                    }`}
-                  >
-                    {t("members_tab_my")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSearchTab("by-contact")}
-                    className={`flex-1 py-2 px-3 transition-colors ${
-                      searchTab === "by-contact"
-                        ? "bg-primary text-primary-foreground font-medium"
-                        : "hover:bg-muted"
-                    }`}
-                  >
-                    {t("members_tab_contact")}
-                  </button>
+                {/* Contact search */}
+                <div className="space-y-2">
+                  <Label>{t("members_contact_label")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder={t("members_contact_placeholder")}
+                      value={contact}
+                      onChange={(e) => {
+                        setContact(e.target.value);
+                        setContactResult(null);
+                        setContactNotFound(false);
+                        setSelectedContact(null);
+                        setInviteDone(false);
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && handleContactSearch()}
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleContactSearch}
+                      disabled={!contact.trim() || contactSearching}
+                    >
+                      {contactSearching ? <Spinner size={16} /> : <Search size={16} />}
+                    </Button>
+                  </div>
                 </div>
 
-                {/* ──── Tab 1: My members ──── */}
-                {searchTab === "my-members" && (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label>{t("members_search_label")}</Label>
-                      <div className="relative">
-                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder={t("members_search_placeholder")}
-                          value={myQuery}
-                          onChange={(e) => handleMyQuery(e.target.value)}
-                          className="pl-9"
-                          autoFocus
-                        />
-                      </div>
+                {/* Found */}
+                {contactResult && (
+                  <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                      {contactResult.first_name?.[0]}{contactResult.last_name?.[0]}
                     </div>
-
-                    {mySearching && (
-                      <div className="flex justify-center py-4">
-                        <Spinner size={20} />
-                      </div>
-                    )}
-
-                    {!mySearching && myResults.length > 0 && (
-                      <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-1">
-                        {myResults.map((m) => (
-                          <button
-                            key={m.member_id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedMyMember(m);
-                              setAlias(m.alias || `${m.first_name} ${m.last_name}`.trim());
-                            }}
-                            className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
-                              selectedMyMember?.member_id === m.member_id
-                                ? "bg-primary/10 text-primary"
-                                : "hover:bg-muted"
-                            }`}
-                          >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold shrink-0">
-                              {m.first_name?.[0]}
-                              {m.last_name?.[0]}
-                            </div>
-                            <div className="flex-1 overflow-hidden">
-                              <p className="font-medium truncate">
-                                {m.alias || `${m.first_name} ${m.last_name}`.trim()}
-                              </p>
-                              <Badge variant={m.role === "admin" ? "default" : "secondary"} className="text-xs mt-0.5">
-                                {m.role}
-                              </Badge>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {!mySearching && myQuery.length >= 2 && myResults.length === 0 && (
-                      <p className="py-2 text-center text-sm text-muted-foreground">
-                        {t("members_no_results", { query: myQuery })}
-                      </p>
-                    )}
+                    <div className="flex-1 overflow-hidden">
+                      <p className="font-medium truncate">{contactResult.first_name} {contactResult.last_name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{contactResult.email || contactResult.phone}</p>
+                    </div>
                   </div>
                 )}
 
-                {/* ──── Tab 2: By contact ──── */}
-                {searchTab === "by-contact" && (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label>{t("members_contact_label")}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder={t("members_contact_placeholder")}
-                          value={contact}
-                          onChange={(e) => {
-                            setContact(e.target.value);
-                            setContactResult(null);
-                            setContactNotFound(false);
-                            setSelectedContact(null);
-                            setInviteDone(false);
-                          }}
-                          onKeyDown={(e) => e.key === "Enter" && handleContactSearch()}
-                          autoFocus
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleContactSearch}
-                          disabled={!contact.trim() || contactSearching}
-                        >
-                          {contactSearching ? <Spinner size={16} /> : <Search size={16} />}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{t("members_contact_hint")}</p>
-                    </div>
-
-                    {/* Found */}
-                    {contactResult && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedContact(contactResult);
-                          setAlias(`${contactResult.first_name} ${contactResult.last_name}`.trim());
-                        }}
-                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
-                          selectedContact?.id === contactResult.id
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "hover:bg-muted"
-                        }`}
-                      >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-xs font-semibold shrink-0">
-                          {contactResult.first_name?.[0]}
-                          {contactResult.last_name?.[0]}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <p className="font-medium truncate">
-                            {contactResult.first_name} {contactResult.last_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {contactResult.email || contactResult.phone}
-                          </p>
-                        </div>
-                      </button>
-                    )}
-
-                    {/* Not found → invite */}
-                    {contactNotFound && !inviteDone && (
-                      <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
-                        <p className="text-sm text-muted-foreground">{t("members_not_found")}</p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleInvite}
-                          disabled={inviteLoading}
-                          className="gap-2"
-                        >
-                          {inviteLoading ? <Spinner size={14} /> : <Mail size={14} />}
-                          {t("members_invite")}
-                        </Button>
-                      </div>
-                    )}
-
-                    {inviteDone && (
-                      <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-700 dark:text-green-400">
-                        {t("members_invite_sent")}
-                      </div>
-                    )}
+                {/* Not found → invite */}
+                {contactNotFound && !inviteDone && (
+                  <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
+                    <p className="text-sm text-muted-foreground">{t("members_not_found")}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleInvite}
+                      disabled={inviteLoading}
+                      className="gap-2"
+                    >
+                      {inviteLoading ? <Spinner size={14} /> : <Mail size={14} />}
+                      {t("members_invite")}
+                    </Button>
                   </div>
                 )}
 
-                {/* Alias & role when a member is selected */}
-                {activeSelection && !inviteDone && (
+                {inviteDone && (
+                  <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-700 dark:text-green-400">
+                    {t("members_invite_sent")}
+                  </div>
+                )}
+
+                {/* Alias & role when result found */}
+                {selectedContact && !inviteDone && (
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="member-alias">{t("members_alias_label")}</Label>
@@ -554,22 +367,12 @@ export default function MembersPage() {
                       <Label>{t("members_role_label")}</Label>
                       <div className="flex gap-2">
                         {canCreateMember && (
-                          <Button
-                            type="button"
-                            variant={role === "member" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setRole("member")}
-                          >
+                          <Button type="button" variant={role === "member" ? "default" : "outline"} size="sm" onClick={() => setRole("member")}>
                             {t("members_role_member")}
                           </Button>
                         )}
                         {canCreateAdmin && (
-                          <Button
-                            type="button"
-                            variant={role === "admin" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setRole("admin")}
-                          >
+                          <Button type="button" variant={role === "admin" ? "default" : "outline"} size="sm" onClick={() => setRole("admin")}>
                             {t("members_role_admin")}
                           </Button>
                         )}
@@ -579,10 +382,8 @@ export default function MembersPage() {
                 )}
 
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setAddOpen(false)}>
-                    {t("members_cancel")}
-                  </Button>
-                  <Button onClick={handleAddMember} disabled={!activeSelection || addLoading || inviteDone}>
+                  <Button variant="outline" onClick={() => setAddOpen(false)}>{t("members_cancel")}</Button>
+                  <Button onClick={handleAddMember} disabled={!selectedContact || addLoading || inviteDone}>
                     {addLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
                     {t("members_add")}
                   </Button>
@@ -595,26 +396,18 @@ export default function MembersPage() {
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle size={16} className="shrink-0" />
-          {error}
+          <AlertCircle size={16} className="shrink-0" />{error}
         </div>
       )}
 
-      {/* Table */}
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size={24} />
-        </div>
+        <div className="flex justify-center py-12"><Spinner size={24} /></div>
       ) : members.length === 0 ? (
         <EmptyState
           icon={<Users size={32} />}
           title={t("members_empty")}
           description={t("members_empty_desc")}
-          action={
-            canCreate
-              ? { label: t("members_add"), onClick: () => setAddOpen(true) }
-              : undefined
-          }
+          action={canCreate ? { label: t("members_add"), onClick: () => setAddOpen(true) } : undefined}
         />
       ) : (
         <DataTable columns={columns} data={members} />
