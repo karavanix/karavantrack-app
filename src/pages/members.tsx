@@ -31,7 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Trash2, AlertCircle, Search, Mail } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Member, GetShipperByContactResponse } from "@/types";
+import type { Member, GetShipperByContactResponse, InviteResponse } from "@/types";
 
 export default function MembersPage() {
   const { selectedCompanyId, hasPermission } = useCompanyStore();
@@ -56,7 +56,6 @@ export default function MembersPage() {
 
   // Invite
   const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteDone, setInviteDone] = useState(false);
 
   // Alias, role & submit
   const [alias, setAlias] = useState("");
@@ -104,10 +103,12 @@ export default function MembersPage() {
         params: { contact: c },
       });
       const results = data ? [data] : [];
-      if (results.length > 0) {
-        setContactResult(results[0]);
-        setSelectedContact(results[0]);
-        setAlias(`${results[0].first_name} ${results[0].last_name}`.trim());
+      if (results.length > 0 && results[0].id) {
+        const res = results[0];
+        setContactResult(res);
+        setSelectedContact(res);
+        const hasName = res.first_name || res.last_name;
+        setAlias(hasName ? `${res.first_name || ''} ${res.last_name || ''}`.trim() : res.email || res.phone || c);
       } else {
         setContactNotFound(true);
       }
@@ -123,8 +124,12 @@ export default function MembersPage() {
     setInviteLoading(true);
     setAddError("");
     try {
-      await api.post("/users/invite", { contact: contact.trim(), role: "shipper" });
-      setInviteDone(true);
+      const { data } = await api.post<InviteResponse>("/users/invite", { contact: contact.trim(), role: "shipper" });
+      const mapped: GetShipperByContactResponse = { ...data };
+      setContactResult(mapped);
+      setSelectedContact(mapped);
+      setContactNotFound(false);
+      setAlias(data.email || data.phone || contact.trim());
     } catch (err) {
       setAddError(getApiErrorMessage(err));
     } finally {
@@ -140,7 +145,7 @@ export default function MembersPage() {
     try {
       await api.post(`/companies/${selectedCompanyId}/members`, {
         user_id: selectedContact.id,
-        alias: alias.trim() || `${selectedContact.first_name} ${selectedContact.last_name}`.trim(),
+        alias: alias.trim() || `${selectedContact.first_name || ''} ${selectedContact.last_name || ''}`.trim() || selectedContact.email || selectedContact.phone,
         role,
       });
       setAddOpen(false);
@@ -158,7 +163,6 @@ export default function MembersPage() {
     setContactResult(null);
     setContactNotFound(false);
     setSelectedContact(null);
-    setInviteDone(false);
     setAlias("");
     setRole("member");
     setAddError("");
@@ -189,7 +193,18 @@ export default function MembersPage() {
     {
       id: "name",
       header: t("members_col_name"),
-      cell: ({ row }) => <span>{row.original.first_name} {row.original.last_name}</span>,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <span>
+            {row.original.first_name || row.original.last_name 
+              ? `${row.original.first_name || ''} ${row.original.last_name || ''}`.trim() 
+              : "—"}
+          </span>
+          {row.original.status === "invited" && (
+            <Badge variant="outline" className="text-yellow-600 border-yellow-600/30 bg-yellow-600/10 dark:text-yellow-400">Invited</Badge>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: "member_id",
@@ -298,7 +313,6 @@ export default function MembersPage() {
                         setContactResult(null);
                         setContactNotFound(false);
                         setSelectedContact(null);
-                        setInviteDone(false);
                       }}
                       onKeyDown={(e) => e.key === "Enter" && handleContactSearch()}
                       autoFocus
@@ -317,18 +331,22 @@ export default function MembersPage() {
                 {/* Found */}
                 {contactResult && (
                   <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
-                      {contactResult.first_name?.[0]}{contactResult.last_name?.[0]}
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0 uppercase">
+                      {contactResult.first_name?.[0] || contactResult.email?.[0] || contactResult.phone?.[0] || "?"}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <p className="font-medium truncate">{contactResult.first_name} {contactResult.last_name}</p>
+                      <p className="font-medium truncate">
+                        {contactResult.first_name || contactResult.last_name 
+                          ? `${contactResult.first_name || ''} ${contactResult.last_name || ''}`.trim() 
+                          : contactResult.email || contactResult.phone || contact}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">{contactResult.email || contactResult.phone}</p>
                     </div>
                   </div>
                 )}
 
                 {/* Not found → invite */}
-                {contactNotFound && !inviteDone && (
+                {contactNotFound && (
                   <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
                     <p className="text-sm text-muted-foreground">{t("members_not_found")}</p>
                     <Button
@@ -345,14 +363,8 @@ export default function MembersPage() {
                   </div>
                 )}
 
-                {inviteDone && (
-                  <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-700 dark:text-green-400">
-                    {t("members_invite_sent")}
-                  </div>
-                )}
-
                 {/* Alias & role when result found */}
-                {selectedContact && !inviteDone && (
+                {selectedContact && (
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="member-alias">{t("members_alias_label")}</Label>
@@ -383,7 +395,7 @@ export default function MembersPage() {
 
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setAddOpen(false)}>{t("members_cancel")}</Button>
-                  <Button onClick={handleAddMember} disabled={!selectedContact || addLoading || inviteDone}>
+                  <Button onClick={handleAddMember} disabled={!selectedContact || addLoading}>
                     {addLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
                     {t("members_add")}
                   </Button>

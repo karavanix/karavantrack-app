@@ -31,7 +31,7 @@ import {
 import { Truck, Plus, Trash2, AlertCircle, Search, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Carrier, GetCarrierByContactResponse } from "@/types";
+import type { Carrier, GetCarrierByContactResponse, InviteResponse } from "@/types";
 
 export default function CarriersPage() {
   const { selectedCompanyId, hasPermission } = useCompanyStore();
@@ -56,7 +56,6 @@ export default function CarriersPage() {
 
   // Invite
   const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteDone, setInviteDone] = useState(false);
 
   // Alias & submit
   const [alias, setAlias] = useState("");
@@ -106,10 +105,12 @@ export default function CarriersPage() {
         params: { contact: c },
       });
       const results = data ? [data] : [];
-      if (results.length > 0) {
-        setContactResult(results[0]);
-        setSelectedContact(results[0]);
-        setAlias(`${results[0].first_name} ${results[0].last_name}`.trim());
+      if (results.length > 0 && results[0].id) {
+        const res = results[0];
+        setContactResult(res);
+        setSelectedContact(res);
+        const hasName = res.first_name || res.last_name;
+        setAlias(hasName ? `${res.first_name || ''} ${res.last_name || ''}`.trim() : res.email || res.phone || c);
       } else {
         setContactNotFound(true);
       }
@@ -125,8 +126,12 @@ export default function CarriersPage() {
     setInviteLoading(true);
     setAddError("");
     try {
-      await api.post("/users/invite", { contact: contact.trim(), role: "carrier" });
-      setInviteDone(true);
+      const { data } = await api.post<InviteResponse>("/users/invite", { contact: contact.trim(), role: "carrier" });
+      const mapped: GetCarrierByContactResponse = { ...data, is_free: true };
+      setContactResult(mapped);
+      setSelectedContact(mapped);
+      setContactNotFound(false);
+      setAlias(data.email || data.phone || contact.trim());
     } catch (err) {
       setAddError(getApiErrorMessage(err));
     } finally {
@@ -142,7 +147,7 @@ export default function CarriersPage() {
     try {
       await api.post(`/companies/${selectedCompanyId}/carriers`, {
         carrier_id: selectedContact.id,
-        alias: alias.trim() || `${selectedContact.first_name} ${selectedContact.last_name}`.trim(),
+        alias: alias.trim() || `${selectedContact.first_name || ''} ${selectedContact.last_name || ''}`.trim() || selectedContact.email || selectedContact.phone,
       });
       setAddOpen(false);
       resetAddForm();
@@ -159,7 +164,6 @@ export default function CarriersPage() {
     setContactResult(null);
     setContactNotFound(false);
     setSelectedContact(null);
-    setInviteDone(false);
     setAlias("");
     setAddError("");
   };
@@ -190,11 +194,16 @@ export default function CarriersPage() {
     {
       id: "status",
       header: t("carriers_col_status"),
-      cell: ({ row }) => (
-        <Badge variant={row.original.is_free ? "success" : "secondary"}>
-          {row.original.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        if (row.original.status === "invited") {
+          return <Badge variant="outline" className="text-yellow-600 border-yellow-600/30 bg-yellow-600/10 dark:text-yellow-400">Invited</Badge>;
+        }
+        return (
+          <Badge variant={row.original.is_free ? "success" : "secondary"}>
+            {row.original.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "carrier_id",
@@ -301,7 +310,6 @@ export default function CarriersPage() {
                         setContactResult(null);
                         setContactNotFound(false);
                         setSelectedContact(null);
-                        setInviteDone(false);
                       }}
                       onKeyDown={(e) => e.key === "Enter" && handleContactSearch()}
                       autoFocus
@@ -320,18 +328,22 @@ export default function CarriersPage() {
                 {/* Found */}
                 {contactResult && (
                   <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
-                      {contactResult.first_name?.[0]}{contactResult.last_name?.[0]}
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0 uppercase">
+                      {contactResult.first_name?.[0] || contactResult.email?.[0] || contactResult.phone?.[0] || "?"}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <p className="font-medium truncate">{contactResult.first_name} {contactResult.last_name}</p>
+                      <p className="font-medium truncate">
+                        {contactResult.first_name || contactResult.last_name 
+                          ? `${contactResult.first_name || ''} ${contactResult.last_name || ''}`.trim() 
+                          : contactResult.email || contactResult.phone || contact}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">{contactResult.email || contactResult.phone}</p>
                     </div>
                   </div>
                 )}
 
                 {/* Not found → invite */}
-                {contactNotFound && !inviteDone && (
+                {contactNotFound && (
                   <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
                     <p className="text-sm text-muted-foreground">{t("carriers_not_found")}</p>
                     <Button
@@ -348,14 +360,8 @@ export default function CarriersPage() {
                   </div>
                 )}
 
-                {inviteDone && (
-                  <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-700 dark:text-green-400">
-                    {t("carriers_invite_sent")}
-                  </div>
-                )}
-
                 {/* Alias field when result found */}
-                {selectedContact && !inviteDone && (
+                {selectedContact && (
                   <div className="space-y-2">
                     <Label htmlFor="carrier-alias">{t("carriers_alias_label")}</Label>
                     <Input
@@ -369,7 +375,7 @@ export default function CarriersPage() {
 
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setAddOpen(false)}>{t("carriers_cancel")}</Button>
-                  <Button onClick={handleAddCarrier} disabled={!selectedContact || addLoading || inviteDone}>
+                  <Button onClick={handleAddCarrier} disabled={!selectedContact || addLoading}>
                     {addLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
                     {t("carriers_add")}
                   </Button>

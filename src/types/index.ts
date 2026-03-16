@@ -91,6 +91,7 @@ export interface Member {
   first_name: string;
   last_name: string;
   role: string;
+  status: string;
   created_at: string;
 }
 
@@ -118,6 +119,7 @@ export interface Carrier {
   last_name: string;
   alias: string;
   is_free: boolean;
+  status: string;
   created_at: string;
 }
 
@@ -145,7 +147,8 @@ export interface GetCarrierByContactResponse {
   first_name: string;
   last_name: string;
   role: string;
-  is_invited?: boolean;
+  status: string;
+  is_free: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -157,7 +160,7 @@ export interface GetShipperByContactResponse {
   first_name: string;
   last_name: string;
   role: string;
-  is_invited?: boolean;
+  status: string;
   created_at: string;
   updated_at: string;
 }
