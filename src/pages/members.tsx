@@ -100,10 +100,10 @@ export default function MembersPage() {
     setContactNotFound(false);
     setSelectedContact(null);
     try {
-      const { data } = await api.get<GetShipperByContactResponse[]>("/users/shippers/by-contact", {
+      const { data } = await api.get<GetShipperByContactResponse>("/users/shippers/by-contact", {
         params: { contact: c },
       });
-      const results = Array.isArray(data) ? data : [];
+      const results = data ? [data] : [];
       if (results.length > 0) {
         setContactResult(results[0]);
         setSelectedContact(results[0]);

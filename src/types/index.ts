@@ -145,6 +145,7 @@ export interface GetCarrierByContactResponse {
   first_name: string;
   last_name: string;
   role: string;
+  is_invited?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -156,6 +157,7 @@ export interface GetShipperByContactResponse {
   first_name: string;
   last_name: string;
   role: string;
+  is_invited?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -173,6 +175,7 @@ export interface InviteResponse {
   first_name: string;
   last_name: string;
   role: string;
+  status: string;
   created_at: string;
   updated_at: string;
 }
