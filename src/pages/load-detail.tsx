@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
+import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
 import {
   Dialog,
   DialogContent,
@@ -41,72 +42,27 @@ import {
   UserPlus,
   Radio,
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import type { Load, Carrier, Position, TrackPoint, TrackResponse, PaginatedResponse } from "@/types";
-
-// Fix Leaflet icons
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
-
-const pickupIcon = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  className: "hue-rotate-[120deg]",
-});
-
-const dropoffIcon = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  className: "hue-rotate-[0deg]",
-});
-
-const carrierIcon = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  className: "hue-rotate-[200deg]", // blue
-});
-
-// Auto-center map when carrier position changes
-function MapFlyTo({ position }: { position: [number, number] | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (position) {
-      map.flyTo(position, map.getZoom(), { duration: 1.5 });
-    }
-  }, [position, map]);
-  return null;
-}
+import type {
+  Load,
+  Carrier,
+  Position,
+  TrackPoint,
+  TrackResponse,
+  PaginatedResponse,
+} from "@/types";
 
 export default function LoadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { selectedCompanyId } = useCompanyStore();
+
   const [load, setLoad] = useState<Load | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Assign dialog
   const [assignOpen, setAssignOpen] = useState(false);
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [carriersLoading, setCarriersLoading] = useState(false);
@@ -114,42 +70,47 @@ export default function LoadDetailPage() {
   const [assignLoading, setAssignLoading] = useState(false);
   const [actionError, setActionError] = useState("");
 
-  // WebSocket real-time tracking
-  const isTrackable = load && ["assigned", "accepted", "in_transit"].includes(load.status);
+  const isTrackable =
+    load != null && ["assigned", "accepted", "in_transit"].includes(load.status);
+
   const { isConnected, lastPosition } = useLoadPositionWS({
     loadId: id,
     enabled: !!isTrackable,
     onPosition: (pos) => setPosition(pos),
   });
 
-  // Update position from WS
   useEffect(() => {
-    if (lastPosition) setPosition(lastPosition);
+    if (lastPosition) {
+      setPosition(lastPosition);
+    }
   }, [lastPosition]);
 
   const fetchLoad = useCallback(async () => {
     if (!id) return;
+
     setIsLoading(true);
+    setError("");
+
     try {
       const { data } = await api.get<Load>(`/loads/${id}`);
       setLoad(data);
 
-      // Fetch position if load is in transit
       if (["assigned", "accepted", "in_transit"].includes(data.status)) {
         try {
           const posRes = await api.get<Position>(`/loads/${id}/position`);
           setPosition(posRes.data);
         } catch {
-          // No position yet
+          setPosition(null);
         }
+      } else {
+        setPosition(null);
       }
 
-      // Fetch track history
       try {
         const trackRes = await api.get<TrackResponse>(`/loads/${id}/track`);
         setTrackPoints(trackRes.data?.points ?? []);
       } catch {
-        // No track yet
+        setTrackPoints([]);
       }
     } catch (err) {
       setError(getApiErrorMessage(err));
@@ -164,9 +125,12 @@ export default function LoadDetailPage() {
 
   const fetchCarriers = async () => {
     if (!selectedCompanyId) return;
+
     setCarriersLoading(true);
     try {
-      const { data } = await api.get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`);
+      const { data } = await api.get<PaginatedResponse<Carrier> | Carrier[]>(
+        `/companies/${selectedCompanyId}/carriers`
+      );
       setCarriers(Array.isArray(data) ? data : (data?.result ?? []));
     } catch {
       setCarriers([]);
@@ -177,8 +141,10 @@ export default function LoadDetailPage() {
 
   const handleAssign = async () => {
     if (!id || !selectedCarrierId) return;
+
     setActionError("");
     setAssignLoading(true);
+
     try {
       await api.post(`/loads/${id}/assign`, { carrier_id: selectedCarrierId });
       setAssignOpen(false);
@@ -193,6 +159,9 @@ export default function LoadDetailPage() {
 
   const handleCancel = async () => {
     if (!id) return;
+
+    setActionError("");
+
     try {
       await api.post(`/loads/${id}/cancel`);
       await fetchLoad();
@@ -203,6 +172,9 @@ export default function LoadDetailPage() {
 
   const handleConfirm = async () => {
     if (!id) return;
+
+    setActionError("");
+
     try {
       await api.post(`/loads/${id}/confirm`);
       await fetchLoad();
@@ -238,12 +210,19 @@ export default function LoadDetailPage() {
   const canCancel = ["created", "assigned"].includes(load.status);
   const canConfirm = load.status === "completed";
 
-  // Map center
-  const mapCenter: [number, number] = position
-    ? [position.lat, position.lng]
-    : load.pickup_lat && load.pickup_lng
-    ? [load.pickup_lat, load.pickup_lng]
-    : [41.3111, 69.2797];
+  const pickup =
+    load.pickup_lat != null && load.pickup_lng != null
+      ? { lat: load.pickup_lat, lng: load.pickup_lng }
+      : null;
+
+  const dropoff =
+    load.dropoff_lat != null && load.dropoff_lng != null
+      ? { lat: load.dropoff_lat, lng: load.dropoff_lng }
+      : null;
+
+  const carrierPosition = position
+    ? { lat: position.lat, lng: position.lng }
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -252,19 +231,24 @@ export default function LoadDetailPage() {
         {t("load_detail_back")}
       </Button>
 
-      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Truck size={24} />
           </div>
+
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{load.title}</h1>
+
             <div className="mt-1 flex items-center gap-2">
               <StatusBadge status={load.status} />
+
               {load.reference_id && (
-                <code className="text-xs text-muted-foreground">#{load.reference_id}</code>
+                <code className="text-xs text-muted-foreground">
+                  #{load.reference_id}
+                </code>
               )}
+
               {isTrackable && (
                 <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
                   <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
@@ -275,7 +259,6 @@ export default function LoadDetailPage() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2">
           {canAssign && (
             <Button
@@ -289,12 +272,18 @@ export default function LoadDetailPage() {
               {t("load_detail_assign_carrier")}
             </Button>
           )}
+
           {canConfirm && (
-            <Button onClick={handleConfirm} variant="default" className="gap-1 bg-success hover:bg-success/90">
+            <Button
+              onClick={handleConfirm}
+              variant="default"
+              className="gap-1 bg-success hover:bg-success/90"
+            >
               <CheckCircle2 size={16} />
               Confirm Delivery
             </Button>
           )}
+
           {canCancel && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -303,13 +292,17 @@ export default function LoadDetailPage() {
                   {t("load_detail_cancel_load")}
                 </Button>
               </AlertDialogTrigger>
+
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{t("load_detail_cancel_load")}?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {t("load_detail_cancel_load")}?
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
                     This will cancel the load. This action can&apos;t be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+
                 <AlertDialogFooter>
                   <AlertDialogCancel>{t("common_cancel")}</AlertDialogCancel>
                   <AlertDialogAction
@@ -332,57 +325,24 @@ export default function LoadDetailPage() {
         </div>
       )}
 
-      {/* Map */}
       <Card>
-        <CardContent className="p-0 overflow-hidden rounded-xl">
+        <CardContent className="overflow-hidden rounded-xl p-0">
           <div className="h-[400px]">
-            <MapContainer center={mapCenter} zoom={12} className="h-full w-full rounded-xl">
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {/* Auto-center on carrier position */}
-              <MapFlyTo position={position ? [position.lat, position.lng] : null} />
-              {/* Pickup marker (green) */}
-              {load.pickup_lat && load.pickup_lng && (
-                <Marker position={[load.pickup_lat, load.pickup_lng]} icon={pickupIcon} />
-              )}
-              {/* Dropoff marker (red) */}
-              {load.dropoff_lat && load.dropoff_lng && (
-                <Marker position={[load.dropoff_lat, load.dropoff_lng]} icon={dropoffIcon} />
-              )}
-              {/* Carrier marker (blue, live) */}
-              {position && (
-                <Marker position={[position.lat, position.lng]} icon={carrierIcon} />
-              )}
-              {/* Track history polyline (solid blue) */}
-              {trackPoints.length > 1 && (
-                <Polyline
-                  positions={trackPoints.map((p) => [p.lat, p.lng] as [number, number])}
-                  color="#3b82f6"
-                  weight={3}
-                  opacity={0.8}
-                />
-              )}
-              {/* Dashed route line (pickup → dropoff) */}
-              {load.pickup_lat && load.dropoff_lat && (
-                <Polyline
-                  positions={[
-                    [load.pickup_lat, load.pickup_lng],
-                    [load.dropoff_lat, load.dropoff_lng],
-                  ]}
-                  color="#64748b"
-                  weight={2}
-                  dashArray="8 4"
-                  opacity={0.4}
-                />
-              )}
-            </MapContainer>
+            <MapLibreTrackingMap
+              className="h-full w-full"
+              pickup={pickup}
+              dropoff={dropoff}
+              carrierPosition={carrierPosition}
+              trackPoints={trackPoints.map((p) => ({
+                lat: p.lat,
+                lng: p.lng,
+              }))}
+              followCarrier={isTrackable}
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Details grid */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
@@ -392,7 +352,9 @@ export default function LoadDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <p className="font-medium">{load.pickup_address || t("load_detail_no_description")}</p>
+            <p className="font-medium">
+              {load.pickup_address || t("load_detail_no_description")}
+            </p>
             <p className="text-xs text-muted-foreground">
               {load.pickup_lat?.toFixed(5)}, {load.pickup_lng?.toFixed(5)}
             </p>
@@ -412,7 +374,9 @@ export default function LoadDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <p className="font-medium">{load.dropoff_address || t("load_detail_no_description")}</p>
+            <p className="font-medium">
+              {load.dropoff_address || t("load_detail_no_description")}
+            </p>
             <p className="text-xs text-muted-foreground">
               {load.dropoff_lat?.toFixed(5)}, {load.dropoff_lng?.toFixed(5)}
             </p>
@@ -435,7 +399,9 @@ export default function LoadDetailPage() {
             {load.carrier_id ? (
               <code className="text-sm">{load.carrier_id}</code>
             ) : (
-              <p className="text-sm text-muted-foreground">{t("load_detail_no_description")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("load_detail_no_description")}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -449,7 +415,9 @@ export default function LoadDetailPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p>
-              <span className="text-muted-foreground">{t("load_detail_created")}:</span>{" "}
+              <span className="text-muted-foreground">
+                {t("load_detail_created")}:
+              </span>{" "}
               {load.created_at ? new Date(load.created_at).toLocaleString() : "—"}
             </p>
             <p>
@@ -460,19 +428,19 @@ export default function LoadDetailPage() {
         </Card>
       </div>
 
-      {/* Description */}
       {load.description && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">{t("load_detail_description")}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("load_detail_description")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{load.description}</p>
+            <p className="whitespace-pre-wrap text-sm">{load.description}</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Assign Carrier Dialog */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -524,15 +492,21 @@ export default function LoadDetailPage() {
                     {carrier.first_name?.[0]}
                     {carrier.last_name?.[0]}
                   </div>
+
                   <div>
                     <p className="font-medium">
-                      {carrier.alias || `${carrier.first_name} ${carrier.last_name}`.trim()}
+                      {carrier.alias ||
+                        `${carrier.first_name} ${carrier.last_name}`.trim()}
                     </p>
+
                     <div className="flex items-center gap-2">
                       <p className="text-xs text-muted-foreground">
                         {carrier.first_name} {carrier.last_name}
                       </p>
-                      <Badge variant={carrier.is_free ? "success" : "secondary"} className="text-[10px] px-1.5 py-0">
+                      <Badge
+                        variant={carrier.is_free ? "success" : "secondary"}
+                        className="px-1.5 py-0 text-[10px]"
+                      >
                         {carrier.is_free ? "Available" : "Busy"}
                       </Badge>
                     </div>
@@ -546,11 +520,10 @@ export default function LoadDetailPage() {
             <Button variant="outline" onClick={() => setAssignOpen(false)}>
               {t("common_cancel")}
             </Button>
-            <Button
-              onClick={handleAssign}
-              disabled={!selectedCarrierId || assignLoading}
-            >
-              {assignLoading ? <Spinner size={16} className="text-primary-foreground" /> : null}
+            <Button onClick={handleAssign} disabled={!selectedCarrierId || assignLoading}>
+              {assignLoading ? (
+                <Spinner size={16} className="text-primary-foreground" />
+              ) : null}
               {t("load_detail_assign_carrier")}
             </Button>
           </DialogFooter>

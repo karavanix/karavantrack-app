@@ -15,94 +15,10 @@ import {
 } from "@/components/location-autocomplete";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapPin, ArrowLeft, AlertCircle, Navigation, Search, Truck, Mail } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import type { Carrier, GetCarrierByContactResponse, InviteResponse } from "@/types";
 
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import MapLibrePickupMap, { type LatLng } from "@/components/map/MapLibrePickupMap";
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
-
-const pickupIcon = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: "hue-rotate-[120deg]",
-});
-
-const dropoffIcon = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: "hue-rotate-[0deg]",
-});
-
-interface LatLng {
-  lat: number;
-  lng: number;
-}
-
-function MapClickHandler({
-  mode,
-  onPickup,
-  onDropoff,
-}: {
-  mode: "pickup" | "dropoff";
-  onPickup: (pos: LatLng) => void;
-  onDropoff: (pos: LatLng) => void;
-}) {
-  useMapEvents({
-    click(e) {
-      if (mode === "pickup") {
-        onPickup({ lat: e.latlng.lat, lng: e.latlng.lng });
-      } else {
-        onDropoff({ lat: e.latlng.lat, lng: e.latlng.lng });
-      }
-    },
-  });
-  return null;
-}
-
-function MapFlyTo({
-  pickup,
-  dropoff,
-  flyTarget,
-}: {
-  pickup: LatLng | null;
-  dropoff: LatLng | null;
-  flyTarget: LatLng | null;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (pickup && dropoff) {
-      const bounds = L.latLngBounds(
-        [pickup.lat, pickup.lng],
-        [dropoff.lat, dropoff.lng]
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
-    } else if (flyTarget) {
-      map.flyTo([flyTarget.lat, flyTarget.lng], 14, { duration: 0.8 });
-    }
-  }, [pickup, dropoff, flyTarget, map]);
-
-  return null;
-}
 
 export default function CreateLoadPage() {
   const navigate = useNavigate();
@@ -125,7 +41,6 @@ export default function CreateLoadPage() {
   const [flyTarget, setFlyTarget] = useState<LatLng | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const mapRef = useRef<L.Map | null>(null);
 
   // ── Carrier selection state (three-tier) ──
   // Tier 1: search within my carriers
@@ -236,7 +151,7 @@ export default function CreateLoadPage() {
   // ── Map helpers ──
   const handleMapPickup = useCallback(async (pos: LatLng) => {
     setPickup(pos);
-    setFlyTarget(pos);
+    setFlyTarget({ lat: pos.lat, lng: pos.lng });
     try {
       const feature = await reverseGeocode(pos.lat, pos.lng);
       setPickupAddress(feature ? formatPhotonFeature(feature) : `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
@@ -247,7 +162,7 @@ export default function CreateLoadPage() {
 
   const handleMapDropoff = useCallback(async (pos: LatLng) => {
     setDropoff(pos);
-    setFlyTarget(pos);
+    setFlyTarget({ lat: pos.lat, lng: pos.lng });
     try {
       const feature = await reverseGeocode(pos.lat, pos.lng);
       setDropoffAddress(feature ? formatPhotonFeature(feature) : `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`);
@@ -457,7 +372,7 @@ export default function CreateLoadPage() {
                     <TabsTrigger value="my-carriers">{t("carriers_tab_my")}</TabsTrigger>
                     <TabsTrigger value="contact">{t("carriers_tab_contact")}</TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="my-carriers" className="mt-0">
                     {/* Tier 1: search within my carriers */}
                     <div className="space-y-1">
@@ -535,8 +450,8 @@ export default function CreateLoadPage() {
                         </div>
                         <div className="flex-1 overflow-hidden">
                           <p className="font-medium text-sm truncate">
-                            {carrierContactResult.first_name || carrierContactResult.last_name 
-                              ? `${carrierContactResult.first_name || ''} ${carrierContactResult.last_name || ''}`.trim() 
+                            {carrierContactResult.first_name || carrierContactResult.last_name
+                              ? `${carrierContactResult.first_name || ''} ${carrierContactResult.last_name || ''}`.trim()
                               : carrierContactResult.email || carrierContactResult.phone || carrierContact}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">{carrierContactResult.email || carrierContactResult.phone}</p>
@@ -653,34 +568,15 @@ export default function CreateLoadPage() {
 
             {/* Map */}
             <div className="h-[350px] overflow-hidden rounded-lg border">
-              <MapContainer
-                center={[center.lat, center.lng]}
-                zoom={12}
-                className="h-full w-full"
-                ref={mapRef}
-                preferCanvas={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  updateWhenZooming={false}
-                  updateWhenIdle={true}
-                  keepBuffer={4}
-                  detectRetina={false}
-                />
-                <MapClickHandler
-                  mode={mapMode}
-                  onPickup={handleMapPickup}
-                  onDropoff={handleMapDropoff}
-                />
-                <MapFlyTo
-                  pickup={pickup}
-                  dropoff={dropoff}
-                  flyTarget={flyTarget}
-                />
-                {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
-                {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
-              </MapContainer>
+              <MapLibrePickupMap
+                center={center}
+                pickup={pickup}
+                dropoff={dropoff}
+                mapMode={mapMode}
+                flyTarget={flyTarget}
+                onPickup={handleMapPickup}
+                onDropoff={handleMapDropoff}
+              />
             </div>
 
             <p className="text-xs text-muted-foreground text-center">
