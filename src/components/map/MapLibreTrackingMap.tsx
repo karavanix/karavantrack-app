@@ -1,24 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import maplibregl, { LngLatBounds } from "maplibre-gl";
-import { Protocol } from "pmtiles";
-import "maplibre-gl/dist/maplibre-gl.css";
-import { useThemeStore } from "@/stores/theme-store";
+import { useMapLibre, type LatLng } from "@/hooks/use-maplibre";
+import { createMapMarker } from "@/components/map/map-markers";
 
-const STYLE_URL_DARK = "https://yool.hel1.your-objectstorage.com/styles/dark.json";
-const STYLE_URL_LIGHT = "https://yool.hel1.your-objectstorage.com/styles/light.json";
+export type { LatLng };
 
 const PLANNED_ROUTE_SOURCE_ID = "planned-route-source";
 const PLANNED_ROUTE_LAYER_ID = "planned-route-layer";
 
 const TRACK_SOURCE_ID = "track-source";
 const TRACK_LAYER_ID = "track-layer";
-
-let protocolRegistered = false;
-
-export type LatLng = {
-  lat: number;
-  lng: number;
-};
 
 type TrackPoint = {
   lat: number;
@@ -59,32 +50,7 @@ function getLineFeature(points: LatLng[]) {
   };
 }
 
-function createMarkerElement(color: string, pulse = false) {
-  const el = document.createElement("div");
-  el.style.width = "18px";
-  el.style.height = "18px";
-  el.style.borderRadius = "9999px";
-  el.style.background = color;
-  el.style.border = "3px solid white";
-  el.style.boxShadow = "0 2px 10px rgba(0,0,0,0.25)";
-  el.style.cursor = "pointer";
 
-  if (pulse) {
-    el.animate(
-      [
-        { transform: "scale(1)", opacity: "1" },
-        { transform: "scale(1.18)", opacity: "0.75" },
-        { transform: "scale(1)", opacity: "1" },
-      ],
-      {
-        duration: 1400,
-        iterations: Infinity,
-      }
-    );
-  }
-
-  return el;
-}
 
 export default function MapLibreTrackingMap({
   pickup,
@@ -94,12 +60,6 @@ export default function MapLibreTrackingMap({
   className,
   followCarrier = true,
 }: Props) {
-  const { theme } = useThemeStore();
-
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const [isMapReady, setIsMapReady] = useState(false);
-
   const pickupMarkerRef = useRef<maplibregl.Marker | null>(null);
   const dropoffMarkerRef = useRef<maplibregl.Marker | null>(null);
   const carrierMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -107,178 +67,141 @@ export default function MapLibreTrackingMap({
   const hasInitiallyFittedRef = useRef(false);
   const hasCenteredCarrierRef = useRef(false);
 
-  useEffect(() => {
-    if (!protocolRegistered) {
-      const protocol = new Protocol();
-      maplibregl.addProtocol("pmtiles", protocol.tile);
-      protocolRegistered = true;
+  const fallbackCenter: [number, number] = pickup
+    ? [pickup.lng, pickup.lat]
+    : dropoff
+    ? [dropoff.lng, dropoff.lat]
+    : carrierPosition
+    ? [carrierPosition.lng, carrierPosition.lat]
+    : [69.2401, 41.2995];
+
+  const ensureSourcesAndLayers = useCallback((map: maplibregl.Map) => {
+    if (!map.getSource(PLANNED_ROUTE_SOURCE_ID)) {
+      map.addSource(PLANNED_ROUTE_SOURCE_ID, {
+        type: "geojson",
+        data: emptyFeatureCollection(),
+      });
     }
 
-    if (!mapContainerRef.current || mapRef.current) return;
+    if (!map.getLayer(PLANNED_ROUTE_LAYER_ID)) {
+      map.addLayer({
+        id: PLANNED_ROUTE_LAYER_ID,
+        type: "line",
+        source: PLANNED_ROUTE_SOURCE_ID,
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": "#64748b",
+          "line-width": 2,
+          "line-opacity": 0.45,
+          "line-dasharray": [4, 4],
+        },
+      });
+    }
 
-    const initialStyle = theme === "dark" ? STYLE_URL_DARK : STYLE_URL_LIGHT;
+    if (!map.getSource(TRACK_SOURCE_ID)) {
+      map.addSource(TRACK_SOURCE_ID, {
+        type: "geojson",
+        data: emptyFeatureCollection(),
+      });
+    }
 
-    const fallbackCenter: [number, number] = pickup
-      ? [pickup.lng, pickup.lat]
-      : dropoff
-      ? [dropoff.lng, dropoff.lat]
-      : carrierPosition
-      ? [carrierPosition.lng, carrierPosition.lat]
-      : [69.2401, 41.2995];
-
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: initialStyle,
-      center: fallbackCenter,
-      zoom: 12,
-    });
-
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
-
-    const ensureSourcesAndLayers = () => {
-      if (!map.getSource(PLANNED_ROUTE_SOURCE_ID)) {
-        map.addSource(PLANNED_ROUTE_SOURCE_ID, {
-          type: "geojson",
-          data: emptyFeatureCollection(),
-        });
-      }
-
-      if (!map.getLayer(PLANNED_ROUTE_LAYER_ID)) {
-        map.addLayer({
-          id: PLANNED_ROUTE_LAYER_ID,
-          type: "line",
-          source: PLANNED_ROUTE_SOURCE_ID,
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
-          paint: {
-            "line-color": "#64748b",
-            "line-width": 2,
-            "line-opacity": 0.45,
-            "line-dasharray": [4, 4],
-          },
-        });
-      }
-
-      if (!map.getSource(TRACK_SOURCE_ID)) {
-        map.addSource(TRACK_SOURCE_ID, {
-          type: "geojson",
-          data: emptyFeatureCollection(),
-        });
-      }
-
-      if (!map.getLayer(TRACK_LAYER_ID)) {
-        map.addLayer({
-          id: TRACK_LAYER_ID,
-          type: "line",
-          source: TRACK_SOURCE_ID,
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
-          paint: {
-            "line-color": "#3b82f6",
-            "line-width": 3,
-            "line-opacity": 0.85,
-          },
-        });
-      }
-    };
-
-    map.on("load", () => {
-      ensureSourcesAndLayers();
-      setIsMapReady(true);
-    });
-    map.on("styledata", ensureSourcesAndLayers);
-
-    mapRef.current = map;
-
-    return () => {
-      pickupMarkerRef.current?.remove();
-      dropoffMarkerRef.current?.remove();
-      carrierMarkerRef.current?.remove();
-      map.remove();
-      mapRef.current = null;
-    };
+    if (!map.getLayer(TRACK_LAYER_ID)) {
+      map.addLayer({
+        id: TRACK_LAYER_ID,
+        type: "line",
+        source: TRACK_SOURCE_ID,
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": "#3b82f6",
+          "line-width": 3,
+          "line-opacity": 0.85,
+        },
+      });
+    }
   }, []);
 
+  const { containerRef, mapRef, isReady } = useMapLibre({
+    center: fallbackCenter,
+    zoom: 12,
+    onStyleReady: ensureSourcesAndLayers,
+  });
+
+  // ── Pickup marker ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !isReady) return;
 
-    const nextStyle = theme === "dark" ? STYLE_URL_DARK : STYLE_URL_LIGHT;
-    map.setStyle(nextStyle);
-  }, [theme]);
+    if (!pickup) {
+      pickupMarkerRef.current?.remove();
+      pickupMarkerRef.current = null;
+      return;
+    }
 
-    useEffect(() => {
-        const map = mapRef.current;
-        if (!map || !isMapReady) return;
+    const lngLat: [number, number] = [Number(pickup.lng), Number(pickup.lat)];
 
-        if (!pickup) {
-            pickupMarkerRef.current?.remove();
-            pickupMarkerRef.current = null;
-            return;
-        }
+    if (!pickupMarkerRef.current) {
+      pickupMarkerRef.current = createMapMarker("pickup", lngLat)
+        .addTo(map);
+    } else {
+      pickupMarkerRef.current.setLngLat(lngLat);
+    }
+  }, [pickup, isReady, mapRef]);
 
-        const lngLat: [number, number] = [Number(pickup.lng), Number(pickup.lat)];
-
-        if (!pickupMarkerRef.current) {
-            pickupMarkerRef.current = new maplibregl.Marker({ element: createMarkerElement("#16a34a") })
-            .setLngLat(lngLat)
-            .addTo(map);
-        } else {
-            pickupMarkerRef.current.setLngLat(lngLat);
-        }
-    }, [pickup, isMapReady]);
-
-useEffect(() => {
-  const map = mapRef.current;
-  if (!map || !isMapReady) return;
-
-  if (!dropoff) {
-    dropoffMarkerRef.current?.remove();
-    dropoffMarkerRef.current = null;
-    return;
-  }
-
-  const lngLat: [number, number] = [Number(dropoff.lng), Number(dropoff.lat)];
-
-  if (!dropoffMarkerRef.current) {
-    dropoffMarkerRef.current = new maplibregl.Marker({ element: createMarkerElement("#dc2626") })
-      .setLngLat(lngLat)
-      .addTo(map);
-  } else {
-    dropoffMarkerRef.current.setLngLat(lngLat);
-  }
-}, [dropoff, isMapReady]);
-
-useEffect(() => {
-  const map = mapRef.current;
-  if (!map || !isMapReady) return;
-
-  if (!carrierPosition) {
-    carrierMarkerRef.current?.remove();
-    carrierMarkerRef.current = null;
-    return;
-  }
-
-  const lngLat: [number, number] = [
-    Number(carrierPosition.lng),
-    Number(carrierPosition.lat),
-  ];
-
-  if (!carrierMarkerRef.current) {
-    carrierMarkerRef.current = new maplibregl.Marker({ element: createMarkerElement("#2563eb", true) })
-      .setLngLat(lngLat)
-      .addTo(map);
-  } else {
-    carrierMarkerRef.current.setLngLat(lngLat);
-  }
-}, [carrierPosition, isMapReady]);
+  // ── Dropoff marker ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isMapReady) return;
+    if (!map || !isReady) return;
+
+    if (!dropoff) {
+      dropoffMarkerRef.current?.remove();
+      dropoffMarkerRef.current = null;
+      return;
+    }
+
+    const lngLat: [number, number] = [Number(dropoff.lng), Number(dropoff.lat)];
+
+    if (!dropoffMarkerRef.current) {
+      dropoffMarkerRef.current = createMapMarker("dropoff", lngLat)
+        .addTo(map);
+    } else {
+      dropoffMarkerRef.current.setLngLat(lngLat);
+    }
+  }, [dropoff, isReady, mapRef]);
+
+  // ── Carrier marker ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady) return;
+
+    if (!carrierPosition) {
+      carrierMarkerRef.current?.remove();
+      carrierMarkerRef.current = null;
+      return;
+    }
+
+    const lngLat: [number, number] = [
+      Number(carrierPosition.lng),
+      Number(carrierPosition.lat),
+    ];
+
+    if (!carrierMarkerRef.current) {
+      carrierMarkerRef.current = createMapMarker("carrier", lngLat)
+        .addTo(map);
+    } else {
+      carrierMarkerRef.current.setLngLat(lngLat);
+    }
+  }, [carrierPosition, isReady, mapRef]);
+
+  // ── Planned route line ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady) return;
 
     const source = map.getSource(PLANNED_ROUTE_SOURCE_ID) as
       | maplibregl.GeoJSONSource
@@ -291,11 +214,12 @@ useEffect(() => {
     } else {
       source.setData(emptyFeatureCollection());
     }
-  }, [pickup, dropoff, isMapReady]);
+  }, [pickup, dropoff, isReady, mapRef]);
 
+  // ── Actual track line ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isMapReady) return;
+    if (!map || !isReady) return;
 
     const source = map.getSource(TRACK_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
     if (!source) return;
@@ -305,11 +229,12 @@ useEffect(() => {
     } else {
       source.setData(emptyFeatureCollection());
     }
-  }, [trackPoints, isMapReady]);
+  }, [trackPoints, isReady, mapRef]);
 
+  // ── Initial bounds fit ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || hasInitiallyFittedRef.current || !isMapReady) return;
+    if (!map || hasInitiallyFittedRef.current || !isReady) return;
 
     const points: [number, number][] = [];
 
@@ -344,11 +269,12 @@ useEffect(() => {
     });
 
     hasInitiallyFittedRef.current = true;
-  }, [pickup, dropoff, carrierPosition, trackPoints, isMapReady]);
+  }, [pickup, dropoff, carrierPosition, trackPoints, isReady, mapRef]);
 
+  // ── Follow carrier ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !carrierPosition || !followCarrier || !isMapReady) return;
+    if (!map || !carrierPosition || !followCarrier || !isReady) return;
 
     const nextCenter: [number, number] = [carrierPosition.lng, carrierPosition.lat];
 
@@ -367,7 +293,16 @@ useEffect(() => {
       duration: 1200,
       essential: true,
     });
-  }, [carrierPosition, followCarrier, isMapReady]);
+  }, [carrierPosition, followCarrier, isReady, mapRef]);
 
-  return <div ref={mapContainerRef} className={className ?? "h-full w-full"} />;
+  // Cleanup markers on unmount
+  useEffect(() => {
+    return () => {
+      pickupMarkerRef.current?.remove();
+      dropoffMarkerRef.current?.remove();
+      carrierMarkerRef.current?.remove();
+    };
+  }, []);
+
+  return <div ref={containerRef} className={className ?? "h-full w-full"} />;
 }

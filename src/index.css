@@ -122,9 +122,9 @@ body {
 }
 
 /*
- * Fix: Leaflet map panes use z-index 400–700 and create a stacking context
- * that can render above Radix UI portals. Force dialog/alert-dialog overlays
- * and content above Leaflet's highest z-index (popup pane = 700).
+ * Fix: MapLibre GL canvas and controls can create a stacking context
+ * that renders above Radix UI portals. Force dialog/alert-dialog overlays
+ * and their content above the map's z-index.
  */
 [data-radix-dialog-overlay],
 [data-radix-alert-dialog-overlay] {

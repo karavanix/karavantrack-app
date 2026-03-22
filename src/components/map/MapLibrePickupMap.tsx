@@ -1,21 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import maplibregl, { LngLatBounds } from "maplibre-gl";
-import { Protocol } from "pmtiles";
-import "maplibre-gl/dist/maplibre-gl.css";
-import { useThemeStore } from "@/stores/theme-store";
+import { useMapLibre, type LatLng } from "@/hooks/use-maplibre";
+import { createMapMarker } from "@/components/map/map-markers";
 
-const STYLE_URL_DARK = "https://yool.hel1.your-objectstorage.com/styles/dark.json";
-const STYLE_URL_LIGHT = "https://yool.hel1.your-objectstorage.com/styles/light.json";
+export type { LatLng };
 
 const ROUTE_SOURCE_ID = "route-source";
 const ROUTE_LAYER_ID = "route-layer";
-
-let protocolRegistered = false;
-
-export type LatLng = {
-  lat: number;
-  lng: number;
-};
 
 type Props = {
   center?: LatLng;
@@ -57,11 +48,6 @@ export default function MapLibrePickupMap({
   onDropoff,
   className,
 }: Props) {
-  const { theme } = useThemeStore();
-
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-
   const pickupMarkerRef = useRef<maplibregl.Marker | null>(null);
   const dropoffMarkerRef = useRef<maplibregl.Marker | null>(null);
 
@@ -69,38 +55,37 @@ export default function MapLibrePickupMap({
   const onPickupRef = useRef(onPickup);
   const onDropoffRef = useRef(onDropoff);
 
-  useEffect(() => {
-    mapModeRef.current = mapMode;
-  }, [mapMode]);
+  useEffect(() => { mapModeRef.current = mapMode; }, [mapMode]);
+  useEffect(() => { onPickupRef.current = onPickup; }, [onPickup]);
+  useEffect(() => { onDropoffRef.current = onDropoff; }, [onDropoff]);
 
-  useEffect(() => {
-    onPickupRef.current = onPickup;
-  }, [onPickup]);
-
-  useEffect(() => {
-    onDropoffRef.current = onDropoff;
-  }, [onDropoff]);
-
-  useEffect(() => {
-    if (!protocolRegistered) {
-      const protocol = new Protocol();
-      maplibregl.addProtocol("pmtiles", protocol.tile);
-      protocolRegistered = true;
+  const addRouteLayer = useCallback((map: maplibregl.Map) => {
+    if (!map.getSource(ROUTE_SOURCE_ID)) {
+      map.addSource(ROUTE_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
     }
 
-    if (!mapContainerRef.current || mapRef.current) return;
+    if (!map.getLayer(ROUTE_LAYER_ID)) {
+      map.addLayer({
+        id: ROUTE_LAYER_ID,
+        type: "line",
+        source: ROUTE_SOURCE_ID,
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": "#2563eb",
+          "line-width": 4,
+          "line-opacity": 0.9,
+        },
+      });
+    }
+  }, []);
 
-    const initialStyle = theme === "dark" ? STYLE_URL_DARK : STYLE_URL_LIGHT;
-
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: initialStyle,
-      center: center ? [center.lng, center.lat] : [69.2401, 41.2995],
-      zoom: 12,
-    });
-
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
-
+  const handleMapReady = useCallback((map: maplibregl.Map) => {
     map.on("click", (e) => {
       const point: LatLng = {
         lat: e.lngLat.lat,
@@ -113,57 +98,16 @@ export default function MapLibrePickupMap({
         onDropoffRef.current(point);
       }
     });
-
-    const addRouteLayer = () => {
-      if (!map.getSource(ROUTE_SOURCE_ID)) {
-        map.addSource(ROUTE_SOURCE_ID, {
-          type: "geojson",
-          data: {
-            type: "FeatureCollection",
-            features: [],
-          },
-        });
-      }
-
-      if (!map.getLayer(ROUTE_LAYER_ID)) {
-        map.addLayer({
-          id: ROUTE_LAYER_ID,
-          type: "line",
-          source: ROUTE_SOURCE_ID,
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
-          paint: {
-            "line-color": "#2563eb",
-            "line-width": 4,
-            "line-opacity": 0.9,
-          },
-        });
-      }
-    };
-
-    map.on("load", addRouteLayer);
-    map.on("styledata", addRouteLayer);
-
-    mapRef.current = map;
-
-    return () => {
-      pickupMarkerRef.current?.remove();
-      dropoffMarkerRef.current?.remove();
-      map.remove();
-      mapRef.current = null;
-    };
   }, []);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
+  const { containerRef, mapRef } = useMapLibre({
+    center: center ? [center.lng, center.lat] : [69.2401, 41.2995],
+    zoom: 12,
+    onReady: handleMapReady,
+    onStyleReady: addRouteLayer,
+  });
 
-    const nextStyle = theme === "dark" ? STYLE_URL_DARK : STYLE_URL_LIGHT;
-    map.setStyle(nextStyle);
-  }, [theme]);
-
+  // ── Pickup marker ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -175,14 +119,14 @@ export default function MapLibrePickupMap({
     }
 
     if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = new maplibregl.Marker({ color: "#16a34a" })
-        .setLngLat([pickup.lng, pickup.lat])
+      pickupMarkerRef.current = createMapMarker("pickup", [pickup.lng, pickup.lat])
         .addTo(map);
     } else {
       pickupMarkerRef.current.setLngLat([pickup.lng, pickup.lat]);
     }
-  }, [pickup]);
+  }, [pickup, mapRef]);
 
+  // ── Dropoff marker ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -194,14 +138,14 @@ export default function MapLibrePickupMap({
     }
 
     if (!dropoffMarkerRef.current) {
-      dropoffMarkerRef.current = new maplibregl.Marker({ color: "#dc2626" })
-        .setLngLat([dropoff.lng, dropoff.lat])
+      dropoffMarkerRef.current = createMapMarker("dropoff", [dropoff.lng, dropoff.lat])
         .addTo(map);
     } else {
       dropoffMarkerRef.current.setLngLat([dropoff.lng, dropoff.lat]);
     }
-  }, [dropoff]);
+  }, [dropoff, mapRef]);
 
+  // ── Route line + fit bounds ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -230,8 +174,9 @@ export default function MapLibrePickupMap({
         features: [],
       });
     }
-  }, [pickup, dropoff]);
+  }, [pickup, dropoff, mapRef]);
 
+  // ── Fly to target ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyTarget || (pickup && dropoff)) return;
@@ -241,7 +186,15 @@ export default function MapLibrePickupMap({
       zoom: 15,
       essential: true,
     });
-  }, [flyTarget, pickup, dropoff]);
+  }, [flyTarget, pickup, dropoff, mapRef]);
 
-  return <div ref={mapContainerRef} className={className ?? "h-full w-full"} />;
+  // Cleanup markers on unmount
+  useEffect(() => {
+    return () => {
+      pickupMarkerRef.current?.remove();
+      dropoffMarkerRef.current?.remove();
+    };
+  }, []);
+
+  return <div ref={containerRef} className={className ?? "h-full w-full"} />;
 }
