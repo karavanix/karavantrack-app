@@ -39,7 +39,7 @@ interface UseMapLibreOptions {
  *
  * Handles PMTiles protocol registration, map creation, navigation control,
  * theme switching, and cleanup. Returns a container ref, the map instance,
- * and a readiness flag.
+ * readiness flag, and any error.
  */
 export function useMapLibre(opts: UseMapLibreOptions = {}) {
   const { center = [69.2401, 41.2995], zoom = 12, onReady, onStyleReady } = opts;
@@ -48,6 +48,7 @@ export function useMapLibre(opts: UseMapLibreOptions = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Stable refs for callbacks so callers don't need to memoize
   const onReadyRef = useRef(onReady);
@@ -76,11 +77,20 @@ export function useMapLibre(opts: UseMapLibreOptions = {}) {
     map.on("load", () => {
       onStyleReadyRef.current?.(map);
       setIsReady(true);
+      setError(null);
       onReadyRef.current?.(map);
     });
 
     map.on("styledata", () => {
       onStyleReadyRef.current?.(map);
+    });
+
+    map.on("error", (e) => {
+      const msg = e.error?.message || "Map failed to load";
+      // Only set error for fatal issues (style/tile loading), not per-tile glitches
+      if (!isReady) {
+        setError(msg);
+      }
     });
 
     mapRef.current = map;
@@ -98,5 +108,5 @@ export function useMapLibre(opts: UseMapLibreOptions = {}) {
     map.setStyle(getStyleUrl(theme));
   }, [theme]);
 
-  return { containerRef, mapRef, isReady };
+  return { containerRef, mapRef, isReady, error };
 }

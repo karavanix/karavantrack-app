@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { wsClient } from "@/lib/ws-client";
 import type { Position } from "@/types";
 
@@ -16,6 +16,10 @@ export function useLoadPositionWS({
   const [isConnected, setIsConnected] = useState(wsClient.connected);
   const [lastPosition, setLastPosition] = useState<Position | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Stable ref so the subscribe callback always sees the latest onPosition
+  const onPositionRef = useRef(onPosition);
+  onPositionRef.current = onPosition;
 
   useEffect(() => {
     if (!loadId || !enabled) return;
@@ -50,7 +54,7 @@ export function useLoadPositionWS({
             recorded_at: (d.recorded_at as string) || new Date().toISOString(),
           };
           setLastPosition(pos);
-          onPosition?.(pos);
+          onPositionRef.current?.(pos);
           break;
         }
 

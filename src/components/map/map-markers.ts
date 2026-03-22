@@ -9,7 +9,7 @@ const VARIANT_CONFIG: Record<MarkerVariant, { color: string; label: string; puls
 };
 
 /**
- * Creates a styled marker DOM element with an optional label tooltip.
+ * Creates a styled marker DOM element with a label and optional heading arrow.
  */
 function createMarkerElement(variant: MarkerVariant) {
   const { color, label, pulse } = VARIANT_CONFIG[variant];
@@ -37,7 +37,10 @@ function createMarkerElement(variant: MarkerVariant) {
   `;
   wrapper.appendChild(tag);
 
-  // ── Dot ──
+  // ── Dot + heading container ──
+  const dotContainer = document.createElement("div");
+  dotContainer.style.cssText = "position: relative; width: 18px; height: 18px;";
+
   const dot = document.createElement("div");
   dot.style.cssText = `
     width: 18px;
@@ -59,7 +62,30 @@ function createMarkerElement(variant: MarkerVariant) {
     );
   }
 
-  wrapper.appendChild(dot);
+  dotContainer.appendChild(dot);
+
+  // ── Heading arrow (carrier only, hidden by default) ──
+  if (variant === "carrier") {
+    const arrow = document.createElement("div");
+    arrow.className = "marker-heading-arrow";
+    arrow.style.cssText = `
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%) rotate(0deg);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 10px solid ${color};
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+      transition: transform 0.6s ease-out;
+      display: none;
+    `;
+    dotContainer.appendChild(arrow);
+  }
+
+  wrapper.appendChild(dotContainer);
 
   return wrapper;
 }
@@ -75,4 +101,25 @@ export function createMapMarker(
     element: createMarkerElement(variant),
     anchor: "bottom",
   }).setLngLat(lngLat);
+}
+
+/**
+ * Update the heading arrow rotation on a carrier marker.
+ * `headingDeg` is degrees clockwise from north (0 = north, 90 = east).
+ */
+export function updateMarkerHeading(
+  marker: maplibregl.Marker,
+  headingDeg: number | null | undefined
+) {
+  const el = marker.getElement();
+  const arrow = el.querySelector(".marker-heading-arrow") as HTMLElement | null;
+  if (!arrow) return;
+
+  if (headingDeg == null || headingDeg === 0) {
+    arrow.style.display = "none";
+    return;
+  }
+
+  arrow.style.display = "block";
+  arrow.style.transform = `translateX(-50%) rotate(${headingDeg}deg)`;
 }

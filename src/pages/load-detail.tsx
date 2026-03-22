@@ -333,11 +333,12 @@ export default function LoadDetailPage() {
               pickup={pickup}
               dropoff={dropoff}
               carrierPosition={carrierPosition}
+              carrierHeading={position?.heading_deg}
               trackPoints={trackPoints.map((p) => ({
                 lat: p.lat,
                 lng: p.lng,
               }))}
-              followCarrier={isTrackable}
+              trackable={isTrackable}
             />
           </div>
         </CardContent>

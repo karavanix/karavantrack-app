@@ -7,7 +7,6 @@ import { reverseGeocode, formatPhotonFeature } from "@/lib/geocoding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import {
   LocationAutocomplete,
@@ -43,25 +42,21 @@ export default function CreateLoadPage() {
   const [error, setError] = useState("");
 
   // ── Carrier selection state (three-tier) ──
-  // Tier 1: search within my carriers
   const [carrierQuery, setCarrierQuery] = useState("");
   const [carrierResults, setCarrierResults] = useState<Carrier[]>([]);
   const [carrierSearching, setCarrierSearching] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
   const carrierTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // Tier 2: by-contact lookup
   const [carrierContact, setCarrierContact] = useState("");
   const [carrierContactResult, setCarrierContactResult] = useState<GetCarrierByContactResponse | null>(null);
   const [carrierContactSearching, setCarrierContactSearching] = useState(false);
   const [carrierContactNotFound, setCarrierContactNotFound] = useState(false);
   const [carrierContactSelected, setCarrierContactSelected] = useState<GetCarrierByContactResponse | null>(null);
 
-  // Tier 3: invite
   const [carrierInviteLoading, setCarrierInviteLoading] = useState(false);
   const [carrierInviteError, setCarrierInviteError] = useState("");
 
-  // Active picked carrier (from either tier 1 or tier 2)
   const pickedCarrierId = selectedCarrier?.carrier_id ?? carrierContactSelected?.id ?? null;
   const pickedCarrierLabel = selectedCarrier
     ? selectedCarrier.alias || `${selectedCarrier.first_name || ''} ${selectedCarrier.last_name || ''}`.trim() || "?"
@@ -230,273 +225,110 @@ export default function CreateLoadPage() {
   const canAssignCarrier = hasPermission("company.carrier.read");
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
-        <ArrowLeft size={16} />
-        {t("create_load_back")}
-      </Button>
-
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("create_load_title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("create_load_subtitle")}</p>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* ── Header ── */}
+      <div className="shrink-0 border-b px-4 py-3 lg:px-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft size={18} />
+          </Button>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">{t("create_load_title")}</h1>
+            <p className="text-xs text-muted-foreground">{t("create_load_subtitle")}</p>
+          </div>
+        </div>
       </div>
 
-      {!canCreate && (
-        <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle size={16} className="shrink-0" />
-          {t("create_load_no_permission")}
-        </div>
-      )}
+      {/* ── Main split layout ── */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+        {/* ── Map (right on desktop, first on mobile) ── */}
+        <div className="h-[280px] lg:h-auto lg:flex-1 lg:order-2 lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-l relative">
+          <MapLibrePickupMap
+            center={center}
+            pickup={pickup}
+            dropoff={dropoff}
+            mapMode={mapMode}
+            flyTarget={flyTarget}
+            onPickup={handleMapPickup}
+            onDropoff={handleMapDropoff}
+            className="h-full w-full"
+          />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-            <AlertCircle size={16} className="shrink-0" />
-            {error}
+          {/* Mode selector overlay on map */}
+          <div className="absolute top-3 left-3 z-10 flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setMapMode("pickup")}
+              className={`
+                flex items-center gap-1.5 rounded-lg px-3 py-1.5
+                text-xs font-semibold shadow-lg backdrop-blur-sm
+                transition-colors duration-150
+                ${mapMode === "pickup"
+                  ? "bg-green-600/90 text-white"
+                  : "bg-white/90 text-gray-700 hover:bg-white dark:bg-gray-900/90 dark:text-gray-200 dark:hover:bg-gray-800/90"
+                }
+              `}
+            >
+              <Navigation size={12} />
+              {t("create_load_set_pickup")}
+              {pickup && " ✓"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapMode("dropoff")}
+              className={`
+                flex items-center gap-1.5 rounded-lg px-3 py-1.5
+                text-xs font-semibold shadow-lg backdrop-blur-sm
+                transition-colors duration-150
+                ${mapMode === "dropoff"
+                  ? "bg-red-600/90 text-white"
+                  : "bg-white/90 text-gray-700 hover:bg-white dark:bg-gray-900/90 dark:text-gray-200 dark:hover:bg-gray-800/90"
+                }
+              `}
+            >
+              <MapPin size={12} />
+              {t("create_load_set_dropoff")}
+              {dropoff && " ✓"}
+            </button>
           </div>
-        )}
 
-        {/* Basic info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("create_load_details_card")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="load-title">{t("create_load_title_label")}</Label>
-              <Input
-                id="load-title"
-                placeholder={t("create_load_title_placeholder")}
-                value={form.title}
-                onChange={(e) => update("title", e.target.value)}
-                required
-                minLength={2}
-                maxLength={255}
-                autoFocus
-                disabled={!canCreate}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="load-ref">
-                {t("create_load_ref_label")}{" "}
-                <span className="text-xs text-muted-foreground">{t("register_phone_optional")}</span>
-              </Label>
-              <Input
-                id="load-ref"
-                placeholder={t("create_load_ref_placeholder")}
-                value={form.reference_id}
-                onChange={(e) => update("reference_id", e.target.value)}
-                maxLength={100}
-                disabled={!canCreate}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="load-desc">{t("create_load_desc_label")}</Label>
-              <textarea
-                id="load-desc"
-                placeholder={t("create_load_desc_placeholder")}
-                value={form.description}
-                onChange={(e) => update("description", e.target.value)}
-                disabled={!canCreate}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </div>
-          </CardContent>
-        </Card>
+          {/* Hint overlay on map */}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+            <span className="rounded-lg bg-black/60 px-3 py-1.5 text-[11px] text-white/90 backdrop-blur-sm">
+              {t("create_load_map_hint", {
+                mode: mapMode === "pickup"
+                  ? t("create_load_map_hint_pickup")
+                  : t("create_load_map_hint_dropoff"),
+              })}
+            </span>
+          </div>
+        </div>
 
-        {/* Schedule */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("create_load_schedule_card")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="pickup-at">
-                  {t("create_load_pickup_at")}{" "}
-                  <span className="text-xs text-muted-foreground">{t("register_phone_optional")}</span>
-                </Label>
-                <Input
-                  id="pickup-at"
-                  type="datetime-local"
-                  value={form.pickup_at}
-                  onChange={(e) => update("pickup_at", e.target.value)}
-                  disabled={!canCreate}
-                />
+        {/* ── Form panel (left on desktop, below map on mobile) ── */}
+        <div className="w-full lg:w-[420px] xl:w-[460px] lg:order-1 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="p-4 lg:p-6 space-y-5">
+            {!canCreate && (
+              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle size={16} className="shrink-0" />
+                {t("create_load_no_permission")}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dropoff-at">
-                  {t("create_load_dropoff_at")}{" "}
-                  <span className="text-xs text-muted-foreground">{t("register_phone_optional")}</span>
-                </Label>
-                <Input
-                  id="dropoff-at"
-                  type="datetime-local"
-                  value={form.dropoff_at}
-                  onChange={(e) => update("dropoff_at", e.target.value)}
-                  disabled={!canCreate}
-                />
+            )}
+
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle size={16} className="shrink-0" />
+                {error}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            )}
 
-        {/* ── Assign Carrier (Tabs) ── */}
-        {canAssignCarrier && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t("create_load_carrier_card")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">{t("create_load_carrier_hint")}</p>
+            {/* ── Locations ── */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("create_load_locations_card")}
+              </h2>
 
-              {/* Picked carrier display */}
-              {pickedCarrierId ? (
-                <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
-                    <Truck size={14} />
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <p className="font-medium text-sm truncate">{pickedCarrierLabel}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {pickedCarrierFree ? t("carriers_status_available") : t("carriers_status_busy")}
-                    </p>
-                  </div>
-                  <Button type="button" variant="ghost" size="sm" onClick={clearCarrierPicker} className="text-muted-foreground">
-                    {t("create_load_carrier_clear")}
-                  </Button>
-                </div>
-              ) : (
-                <Tabs defaultValue="my-carriers" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-4">
-                    <TabsTrigger value="my-carriers">{t("carriers_tab_my")}</TabsTrigger>
-                    <TabsTrigger value="contact">{t("carriers_tab_contact")}</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="my-carriers" className="mt-0">
-                    {/* Tier 1: search within my carriers */}
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">{t("create_load_carrier_search_own")}</Label>
-                      <div className="relative">
-                          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            placeholder={t("create_load_carrier_search")}
-                            value={carrierQuery}
-                            onChange={(e) => handleCarrierSearch(e.target.value)}
-                            className="pl-9"
-                            disabled={!canCreate}
-                          />
-                        </div>
-                        {carrierSearching && <div className="flex justify-center py-2"><Spinner size={16} /></div>}
-                        {!carrierSearching && carrierResults.length > 0 && (
-                          <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border p-1">
-                            {carrierResults.map((c) => (
-                              <button
-                                key={c.carrier_id}
-                                type="button"
-                                onClick={() => { setSelectedCarrier(c); setCarrierQuery(c.alias || `${c.first_name} ${c.last_name}`.trim()); setCarrierResults([]); }}
-                                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
-                              >
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold shrink-0 uppercase">
-                                  {c.first_name?.[0] || c.alias?.[0] || "?"}
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                  <p className="font-medium truncate">{c.alias || `${c.first_name || ''} ${c.last_name || ''}`.trim() || "Unknown Carrier"}</p>
-                                </div>
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                                  c.is_free ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
-                                }`}>
-                                  {c.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                  </TabsContent>
-
-                  <TabsContent value="contact" className="mt-0 space-y-3">
-                    {/* Tier 2: by-contact */}
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">{t("create_load_carrier_contact_label")}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder={t("carriers_contact_placeholder")}
-                          value={carrierContact}
-                          onChange={(e) => {
-                            setCarrierContact(e.target.value);
-                            setCarrierContactResult(null);
-                            setCarrierContactNotFound(false);
-                            setCarrierContactSelected(null);
-                          }}
-                          onKeyDown={(e) => e.key === "Enter" && handleCarrierContactSearch()}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleCarrierContactSearch}
-                          disabled={!carrierContact.trim() || carrierContactSearching}
-                        >
-                          {carrierContactSearching ? <Spinner size={16} /> : <Search size={16} />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* By-contact result */}
-                    {carrierContactResult && !carrierContactSelected && (
-                      <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0 uppercase">
-                          {carrierContactResult.first_name?.[0] || carrierContactResult.email?.[0] || carrierContactResult.phone?.[0] || "?"}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <p className="font-medium text-sm truncate">
-                            {carrierContactResult.first_name || carrierContactResult.last_name
-                              ? `${carrierContactResult.first_name || ''} ${carrierContactResult.last_name || ''}`.trim()
-                              : carrierContactResult.email || carrierContactResult.phone || carrierContact}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">{carrierContactResult.email || carrierContactResult.phone}</p>
-                        </div>
-                        <Button type="button" size="sm" onClick={() => setCarrierContactSelected(carrierContactResult)}>
-                          {t("create_load_carrier_select")}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Not found → invite */}
-                    {carrierContactNotFound && (
-                      <div className="rounded-lg border border-dashed p-3 text-center space-y-2">
-                        <p className="text-xs text-muted-foreground">{t("carriers_not_found")}</p>
-                        {carrierInviteError && <p className="text-xs text-destructive">{carrierInviteError}</p>}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCarrierInvite}
-                          disabled={carrierInviteLoading}
-                          className="gap-2"
-                        >
-                          {carrierInviteLoading ? <Spinner size={14} /> : <Mail size={14} />}
-                          {t("carriers_invite")}
-                        </Button>
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Locations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("create_load_locations_card")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Address search inputs */}
-            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="pickup-search">{t("create_load_pickup_addr")}</Label>
+                <Label htmlFor="pickup-search" className="text-xs">{t("create_load_pickup_addr")}</Label>
                 <LocationAutocomplete
                   id="pickup-search"
                   placeholder={t("create_load_search_pickup")}
@@ -507,13 +339,14 @@ export default function CreateLoadPage() {
                   biasLon={center.lng}
                 />
                 {pickup && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     📍 {pickup.lat.toFixed(5)}, {pickup.lng.toFixed(5)}
                   </p>
                 )}
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="dropoff-search">{t("create_load_dropoff_addr")}</Label>
+                <Label htmlFor="dropoff-search" className="text-xs">{t("create_load_dropoff_addr")}</Label>
                 <LocationAutocomplete
                   id="dropoff-search"
                   placeholder={t("create_load_search_dropoff")}
@@ -524,84 +357,261 @@ export default function CreateLoadPage() {
                   biasLon={center.lng}
                 />
                 {dropoff && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     🏁 {dropoff.lat.toFixed(5)}, {dropoff.lng.toFixed(5)}
                   </p>
                 )}
               </div>
-            </div>
+            </section>
 
-            {/* Mode selector + hint */}
-            <div className="flex items-center gap-3">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={mapMode === "pickup" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setMapMode("pickup")}
-                  className="gap-1"
-                >
-                  <Navigation size={14} />
-                  {t("create_load_set_pickup")}
-                  {pickup && " ✓"}
-                </Button>
-                <Button
-                  type="button"
-                  variant={mapMode === "dropoff" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setMapMode("dropoff")}
-                  className="gap-1"
-                >
-                  <MapPin size={14} />
-                  {t("create_load_set_dropoff")}
-                  {dropoff && " ✓"}
-                </Button>
+            <hr className="border-border" />
+
+            {/* ── Load details ── */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("create_load_details_card")}
+              </h2>
+
+              <div className="space-y-2">
+                <Label htmlFor="load-title" className="text-xs">{t("create_load_title_label")}</Label>
+                <Input
+                  id="load-title"
+                  placeholder={t("create_load_title_placeholder")}
+                  value={form.title}
+                  onChange={(e) => update("title", e.target.value)}
+                  required
+                  minLength={2}
+                  maxLength={255}
+                  autoFocus
+                  disabled={!canCreate}
+                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t("create_load_map_hint", {
-                  mode: mapMode === "pickup"
-                    ? t("create_load_map_hint_pickup")
-                    : t("create_load_map_hint_dropoff"),
-                })}
-              </p>
-            </div>
 
-            {/* Map */}
-            <div className="h-[350px] overflow-hidden rounded-lg border">
-              <MapLibrePickupMap
-                center={center}
-                pickup={pickup}
-                dropoff={dropoff}
-                mapMode={mapMode}
-                flyTarget={flyTarget}
-                onPickup={handleMapPickup}
-                onDropoff={handleMapDropoff}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="load-ref" className="text-xs">
+                  {t("create_load_ref_label")}{" "}
+                  <span className="text-muted-foreground">{t("register_phone_optional")}</span>
+                </Label>
+                <Input
+                  id="load-ref"
+                  placeholder={t("create_load_ref_placeholder")}
+                  value={form.reference_id}
+                  onChange={(e) => update("reference_id", e.target.value)}
+                  maxLength={100}
+                  disabled={!canCreate}
+                />
+              </div>
 
-            <p className="text-xs text-muted-foreground text-center">
-              💡 {t("create_load_paste_hint")}
-            </p>
-          </CardContent>
-        </Card>
+              <div className="space-y-2">
+                <Label htmlFor="load-desc" className="text-xs">{t("create_load_desc_label")}</Label>
+                <textarea
+                  id="load-desc"
+                  placeholder={t("create_load_desc_placeholder")}
+                  value={form.description}
+                  onChange={(e) => update("description", e.target.value)}
+                  disabled={!canCreate}
+                  rows={3}
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+            </section>
 
-        {/* Submit */}
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-            {t("create_load_cancel")}
-          </Button>
-          <Button type="submit" disabled={isLoading || !canCreate}>
-            {isLoading ? (
+            <hr className="border-border" />
+
+            {/* ── Schedule ── */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("create_load_schedule_card")}
+              </h2>
+              <div className="grid gap-3 grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="pickup-at" className="text-xs">
+                    {t("create_load_pickup_at")}{" "}
+                    <span className="text-muted-foreground">{t("register_phone_optional")}</span>
+                  </Label>
+                  <Input
+                    id="pickup-at"
+                    type="datetime-local"
+                    value={form.pickup_at}
+                    onChange={(e) => update("pickup_at", e.target.value)}
+                    disabled={!canCreate}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dropoff-at" className="text-xs">
+                    {t("create_load_dropoff_at")}{" "}
+                    <span className="text-muted-foreground">{t("register_phone_optional")}</span>
+                  </Label>
+                  <Input
+                    id="dropoff-at"
+                    type="datetime-local"
+                    value={form.dropoff_at}
+                    onChange={(e) => update("dropoff_at", e.target.value)}
+                    disabled={!canCreate}
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* ── Carrier ── */}
+            {canAssignCarrier && (
               <>
-                <Spinner size={16} className="text-primary-foreground" />
-                {t("create_load_creating")}
+                <hr className="border-border" />
+                <section className="space-y-3">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t("create_load_carrier_card")}
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">{t("create_load_carrier_hint")}</p>
+
+                  {pickedCarrierId ? (
+                    <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                        <Truck size={14} />
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <p className="font-medium text-sm truncate">{pickedCarrierLabel}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {pickedCarrierFree ? t("carriers_status_available") : t("carriers_status_busy")}
+                        </p>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={clearCarrierPicker} className="text-muted-foreground">
+                        {t("create_load_carrier_clear")}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Tabs defaultValue="my-carriers" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 mb-3">
+                        <TabsTrigger value="my-carriers">{t("carriers_tab_my")}</TabsTrigger>
+                        <TabsTrigger value="contact">{t("carriers_tab_contact")}</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="my-carriers" className="mt-0">
+                        <div className="space-y-1">
+                          <div className="relative">
+                            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              placeholder={t("create_load_carrier_search")}
+                              value={carrierQuery}
+                              onChange={(e) => handleCarrierSearch(e.target.value)}
+                              className="pl-9"
+                              disabled={!canCreate}
+                            />
+                          </div>
+                          {carrierSearching && <div className="flex justify-center py-2"><Spinner size={16} /></div>}
+                          {!carrierSearching && carrierResults.length > 0 && (
+                            <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border p-1">
+                              {carrierResults.map((c) => (
+                                <button
+                                  key={c.carrier_id}
+                                  type="button"
+                                  onClick={() => { setSelectedCarrier(c); setCarrierQuery(c.alias || `${c.first_name} ${c.last_name}`.trim()); setCarrierResults([]); }}
+                                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+                                >
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold shrink-0 uppercase">
+                                    {c.first_name?.[0] || c.alias?.[0] || "?"}
+                                  </div>
+                                  <div className="flex-1 overflow-hidden">
+                                    <p className="font-medium truncate">{c.alias || `${c.first_name || ''} ${c.last_name || ''}`.trim() || "Unknown Carrier"}</p>
+                                  </div>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                    c.is_free ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
+                                  }`}>
+                                    {c.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="contact" className="mt-0 space-y-3">
+                        <div className="space-y-1">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder={t("carriers_contact_placeholder")}
+                              value={carrierContact}
+                              onChange={(e) => {
+                                setCarrierContact(e.target.value);
+                                setCarrierContactResult(null);
+                                setCarrierContactNotFound(false);
+                                setCarrierContactSelected(null);
+                              }}
+                              onKeyDown={(e) => e.key === "Enter" && handleCarrierContactSearch()}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleCarrierContactSearch}
+                              disabled={!carrierContact.trim() || carrierContactSearching}
+                            >
+                              {carrierContactSearching ? <Spinner size={16} /> : <Search size={16} />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {carrierContactResult && !carrierContactSelected && (
+                          <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0 uppercase">
+                              {carrierContactResult.first_name?.[0] || carrierContactResult.email?.[0] || carrierContactResult.phone?.[0] || "?"}
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <p className="font-medium text-sm truncate">
+                                {carrierContactResult.first_name || carrierContactResult.last_name
+                                  ? `${carrierContactResult.first_name || ''} ${carrierContactResult.last_name || ''}`.trim()
+                                  : carrierContactResult.email || carrierContactResult.phone || carrierContact}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">{carrierContactResult.email || carrierContactResult.phone}</p>
+                            </div>
+                            <Button type="button" size="sm" onClick={() => setCarrierContactSelected(carrierContactResult)}>
+                              {t("create_load_carrier_select")}
+                            </Button>
+                          </div>
+                        )}
+
+                        {carrierContactNotFound && (
+                          <div className="rounded-lg border border-dashed p-3 text-center space-y-2">
+                            <p className="text-xs text-muted-foreground">{t("carriers_not_found")}</p>
+                            {carrierInviteError && <p className="text-xs text-destructive">{carrierInviteError}</p>}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCarrierInvite}
+                              disabled={carrierInviteLoading}
+                              className="gap-2"
+                            >
+                              {carrierInviteLoading ? <Spinner size={14} /> : <Mail size={14} />}
+                              {t("carriers_invite")}
+                            </Button>
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  )}
+                </section>
               </>
-            ) : (
-              t("create_load_submit")
             )}
-          </Button>
+
+            {/* ── Submit ── */}
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => navigate(-1)} className="flex-1">
+                {t("create_load_cancel")}
+              </Button>
+              <Button type="submit" disabled={isLoading || !canCreate} className="flex-1">
+                {isLoading ? (
+                  <>
+                    <Spinner size={16} className="text-primary-foreground" />
+                    {t("create_load_creating")}
+                  </>
+                ) : (
+                  t("create_load_submit")
+                )}
+              </Button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

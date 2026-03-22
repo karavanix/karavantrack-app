@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import maplibregl, { LngLatBounds } from "maplibre-gl";
 import { useMapLibre, type LatLng } from "@/hooks/use-maplibre";
 import { createMapMarker } from "@/components/map/map-markers";
+import { MapOverlay } from "@/components/map/MapOverlay";
 
 export type { LatLng };
 
@@ -100,7 +101,7 @@ export default function MapLibrePickupMap({
     });
   }, []);
 
-  const { containerRef, mapRef } = useMapLibre({
+  const { containerRef, mapRef, isReady, error } = useMapLibre({
     center: center ? [center.lng, center.lat] : [69.2401, 41.2995],
     zoom: 12,
     onReady: handleMapReady,
@@ -196,5 +197,10 @@ export default function MapLibrePickupMap({
     };
   }, []);
 
-  return <div ref={containerRef} className={className ?? "h-full w-full"} />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className={className ?? "h-full w-full"} />
+      <MapOverlay isReady={isReady} error={error} />
+    </div>
+  );
 }
