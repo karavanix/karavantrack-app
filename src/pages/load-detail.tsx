@@ -6,7 +6,6 @@ import { api, getApiErrorMessage } from "@/lib/api";
 import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
 import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
@@ -41,6 +40,8 @@ import {
   XCircle,
   UserPlus,
   Radio,
+  Gauge,
+  Clock,
 } from "lucide-react";
 import type {
   Load,
@@ -159,9 +160,7 @@ export default function LoadDetailPage() {
 
   const handleCancel = async () => {
     if (!id) return;
-
     setActionError("");
-
     try {
       await api.post(`/loads/${id}/cancel`);
       await fetchLoad();
@@ -172,9 +171,7 @@ export default function LoadDetailPage() {
 
   const handleConfirm = async () => {
     if (!id) return;
-
     setActionError("");
-
     try {
       await api.post(`/loads/${id}/confirm`);
       await fetchLoad();
@@ -183,6 +180,7 @@ export default function LoadDetailPage() {
     }
   };
 
+  // ── Loading / Error states ──
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -224,224 +222,261 @@ export default function LoadDetailPage() {
     ? { lat: position.lat, lng: position.lng }
     : null;
 
+  const speedKmh = position ? Math.round((position.speed_mps ?? 0) * 3.6) : null;
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
-        <ArrowLeft size={16} />
-        {t("load_detail_back")}
-      </Button>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Truck size={24} />
-          </div>
-
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{load.title}</h1>
-
-            <div className="mt-1 flex items-center gap-2">
-              <StatusBadge status={load.status} />
-
-              {load.reference_id && (
-                <code className="text-xs text-muted-foreground">
-                  #{load.reference_id}
-                </code>
-              )}
-
-              {isTrackable && (
-                <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
-                  <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
-                  {isConnected ? "Live" : t("common_error")}
-                </Badge>
-              )}
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* ── Header ── */}
+      <div className="shrink-0 border-b px-4 py-3 lg:px-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0">
+              <ArrowLeft size={18} />
+            </Button>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+              <Truck size={20} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-tight truncate">{load.title}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusBadge status={load.status} />
+                {load.reference_id && (
+                  <code className="text-[11px] text-muted-foreground">#{load.reference_id}</code>
+                )}
+                {isTrackable && (
+                  <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
+                    <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
+                    {isConnected ? "Live" : t("common_error")}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex gap-2">
-          {canAssign && (
-            <Button
-              onClick={() => {
-                setAssignOpen(true);
-                fetchCarriers();
-              }}
-              className="gap-1"
-            >
-              <UserPlus size={16} />
-              {t("load_detail_assign_carrier")}
-            </Button>
-          )}
-
-          {canConfirm && (
-            <Button
-              onClick={handleConfirm}
-              variant="default"
-              className="gap-1 bg-success hover:bg-success/90"
-            >
-              <CheckCircle2 size={16} />
-              Confirm Delivery
-            </Button>
-          )}
-
-          {canCancel && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="gap-1">
-                  <XCircle size={16} />
-                  {t("load_detail_cancel_load")}
-                </Button>
-              </AlertDialogTrigger>
-
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {t("load_detail_cancel_load")}?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will cancel the load. This action can&apos;t be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t("common_cancel")}</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleCancel}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
+          <div className="flex gap-2 shrink-0">
+            {canAssign && (
+              <Button
+                size="sm"
+                onClick={() => { setAssignOpen(true); fetchCarriers(); }}
+                className="gap-1"
+              >
+                <UserPlus size={14} />
+                {t("load_detail_assign_carrier")}
+              </Button>
+            )}
+            {canConfirm && (
+              <Button
+                size="sm"
+                onClick={handleConfirm}
+                className="gap-1 bg-success hover:bg-success/90"
+              >
+                <CheckCircle2 size={14} />
+                Confirm Delivery
+              </Button>
+            )}
+            {canCancel && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-1">
+                    <XCircle size={14} />
                     {t("load_detail_cancel_load")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-        </div>
-      </div>
-
-      {actionError && (
-        <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle size={16} className="shrink-0" />
-          {actionError}
-        </div>
-      )}
-
-      <Card>
-        <CardContent className="overflow-hidden rounded-xl p-0">
-          <div className="h-[400px]">
-            <MapLibreTrackingMap
-              className="h-full w-full"
-              pickup={pickup}
-              dropoff={dropoff}
-              carrierPosition={carrierPosition}
-              carrierHeading={position?.heading_deg}
-              trackPoints={trackPoints.map((p) => ({
-                lat: p.lat,
-                lng: p.lng,
-              }))}
-              trackable={isTrackable}
-            />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("load_detail_cancel_load")}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will cancel the load. This action can&apos;t be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("common_cancel")}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleCancel}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {t("load_detail_cancel_load")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Navigation size={14} className="text-success" />
-              {t("load_detail_pickup")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <p className="font-medium">
-              {load.pickup_address || t("load_detail_no_description")}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {load.pickup_lat?.toFixed(5)}, {load.pickup_lng?.toFixed(5)}
-            </p>
-            {load.pickup_at && (
-              <p className="text-xs text-muted-foreground">
-                🕒 {new Date(load.pickup_at).toLocaleString()}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <MapPin size={14} className="text-destructive" />
-              {t("load_detail_dropoff")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <p className="font-medium">
-              {load.dropoff_address || t("load_detail_no_description")}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {load.dropoff_lat?.toFixed(5)}, {load.dropoff_lng?.toFixed(5)}
-            </p>
-            {load.dropoff_at && (
-              <p className="text-xs text-muted-foreground">
-                🕒 {new Date(load.dropoff_at).toLocaleString()}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <User size={14} />
-              {t("load_detail_carrier")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {load.carrier_id ? (
-              <code className="text-sm">{load.carrier_id}</code>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("load_detail_no_description")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Calendar size={14} />
-              Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p>
-              <span className="text-muted-foreground">
-                {t("load_detail_created")}:
-              </span>{" "}
-              {load.created_at ? new Date(load.created_at).toLocaleString() : "—"}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Updated:</span>{" "}
-              {load.updated_at ? new Date(load.updated_at).toLocaleString() : "—"}
-            </p>
-          </CardContent>
-        </Card>
+        {actionError && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg bg-destructive/10 p-2.5 text-sm text-destructive">
+            <AlertCircle size={14} className="shrink-0" />
+            {actionError}
+          </div>
+        )}
       </div>
 
-      {load.description && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t("load_detail_description")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{load.description}</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* ── Main split layout ── */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+        {/* ── Map (right on desktop, first on mobile) ── */}
+        <div className="h-[280px] lg:h-auto lg:flex-1 lg:order-2 lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-l">
+          <MapLibreTrackingMap
+            className="h-full w-full"
+            pickup={pickup}
+            dropoff={dropoff}
+            carrierPosition={carrierPosition}
+            carrierHeading={position?.heading_deg}
+            trackPoints={trackPoints.map((p) => ({
+              lat: p.lat,
+              lng: p.lng,
+            }))}
+            trackable={isTrackable}
+          />
+        </div>
 
+        {/* ── Info panel (left on desktop, below map on mobile) ── */}
+        <div className="w-full lg:w-[400px] xl:w-[440px] lg:order-1 overflow-y-auto">
+          <div className="p-4 lg:p-6 space-y-5">
+
+            {/* ── Pickup ── */}
+            <section className="space-y-1.5">
+              <h2 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <Navigation size={12} className="text-green-500" />
+                {t("load_detail_pickup")}
+              </h2>
+              <p className="text-sm font-medium">
+                {load.pickup_address || t("load_detail_no_description")}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                📍 {load.pickup_lat?.toFixed(5)}, {load.pickup_lng?.toFixed(5)}
+              </p>
+              {load.pickup_at && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Clock size={10} />
+                  {new Date(load.pickup_at).toLocaleString()}
+                </p>
+              )}
+            </section>
+
+            <hr className="border-border" />
+
+            {/* ── Dropoff ── */}
+            <section className="space-y-1.5">
+              <h2 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <MapPin size={12} className="text-red-500" />
+                {t("load_detail_dropoff")}
+              </h2>
+              <p className="text-sm font-medium">
+                {load.dropoff_address || t("load_detail_no_description")}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                🏁 {load.dropoff_lat?.toFixed(5)}, {load.dropoff_lng?.toFixed(5)}
+              </p>
+              {load.dropoff_at && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Clock size={10} />
+                  {new Date(load.dropoff_at).toLocaleString()}
+                </p>
+              )}
+            </section>
+
+            <hr className="border-border" />
+
+            {/* ── Carrier + Live telemetry ── */}
+            <section className="space-y-1.5">
+              <h2 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <User size={12} />
+                {t("load_detail_carrier")}
+              </h2>
+              {load.carrier_id ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                      <Truck size={14} />
+                    </div>
+                    <code className="text-sm truncate">{load.carrier_id}</code>
+                  </div>
+
+                  {/* Live telemetry */}
+                  {isTrackable && position && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                          <Gauge size={11} />
+                          <span className="text-[10px] uppercase">Speed</span>
+                        </div>
+                        <p className="text-sm font-bold tabular-nums">
+                          {speedKmh} <span className="text-[10px] font-normal text-muted-foreground">km/h</span>
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                          <Navigation size={11} />
+                          <span className="text-[10px] uppercase">Heading</span>
+                        </div>
+                        <p className="text-sm font-bold tabular-nums">
+                          {Math.round(position.heading_deg)}°
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                          <Radio size={11} />
+                          <span className="text-[10px] uppercase">Accuracy</span>
+                        </div>
+                        <p className="text-sm font-bold tabular-nums">
+                          {Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">m</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {isTrackable && position?.recorded_at && (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Clock size={10} />
+                      Last update: {new Date(position.recorded_at).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {t("load_detail_no_description")}
+                </p>
+              )}
+            </section>
+
+            {/* ── Description ── */}
+            {load.description && (
+              <>
+                <hr className="border-border" />
+                <section className="space-y-1.5">
+                  <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t("load_detail_description")}
+                  </h2>
+                  <p className="whitespace-pre-wrap text-sm">{load.description}</p>
+                </section>
+              </>
+            )}
+
+            <hr className="border-border" />
+
+            {/* ── Timeline ── */}
+            <section className="space-y-1.5">
+              <h2 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <Calendar size={12} />
+                Timeline
+              </h2>
+              <div className="space-y-1 text-sm">
+                <p>
+                  <span className="text-muted-foreground">{t("load_detail_created")}:</span>{" "}
+                  {load.created_at ? new Date(load.created_at).toLocaleString() : "—"}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Updated:</span>{" "}
+                  {load.updated_at ? new Date(load.updated_at).toLocaleString() : "—"}
+                </p>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Assign Carrier Dialog ── */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
