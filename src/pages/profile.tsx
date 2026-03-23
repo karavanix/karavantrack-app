@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { User as UserIcon, Mail, Phone, Shield, Calendar, Check, AlertCircle } from "lucide-react";
+import { utcToLocalDateDisplay } from "@/lib/date-utils";
 
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
@@ -199,7 +200,7 @@ export default function ProfilePage() {
                 {t("profile_joined")}
               </p>
               <p className="text-sm">
-                {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
+                {utcToLocalDateDisplay(user.created_at)}
               </p>
             </div>
           </div>

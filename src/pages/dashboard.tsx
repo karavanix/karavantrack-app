@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Package, Plus, Building2, Eye, RefreshCw } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Load, LoadStats, PaginatedResponse } from "@/types";
+import { utcToLocalDateDisplay } from "@/lib/date-utils";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -120,10 +121,7 @@ export default function DashboardPage() {
     {
       accessorKey: "created_at",
       header: t("dashboard_col_created"),
-      cell: ({ row }) =>
-        row.original.created_at
-          ? new Date(row.original.created_at).toLocaleDateString()
-          : "—",
+      cell: ({ row }) => utcToLocalDateDisplay(row.original.created_at),
     },
     {
       id: "actions",

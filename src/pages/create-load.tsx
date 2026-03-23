@@ -15,6 +15,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapPin, ArrowLeft, AlertCircle, Navigation, Search, Truck, Mail } from "lucide-react";
 import type { Carrier, GetCarrierByContactResponse, InviteResponse } from "@/types";
+import { localToUtc } from "@/lib/date-utils";
 
 import MapLibrePickupMap, { type LatLng } from "@/components/map/MapLibrePickupMap";
 
@@ -206,11 +207,11 @@ export default function CreateLoadPage() {
         pickup_address: pickupAddress.trim() || undefined,
         pickup_lat: pickup.lat,
         pickup_lng: pickup.lng,
-        pickup_at: form.pickup_at || undefined,
+        pickup_at: localToUtc(form.pickup_at),
         dropoff_address: dropoffAddress.trim() || undefined,
         dropoff_lat: dropoff.lat,
         dropoff_lng: dropoff.lng,
-        dropoff_at: form.dropoff_at || undefined,
+        dropoff_at: localToUtc(form.dropoff_at),
         carrier_id: pickedCarrierId || undefined,
       });
       navigate(`/loads/${data.id}`, { replace: true });

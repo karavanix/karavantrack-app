@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Spinner } from "@/components/ui/spinner";
 import { Building2, AlertCircle, Check } from "lucide-react";
 import type { Company } from "@/types";
+import { utcToLocalDateDisplay } from "@/lib/date-utils";
 
 export default function CompanySettingsPage() {
   const { selectedCompanyId, fetchCompanies } = useCompanyStore();
@@ -166,9 +167,7 @@ export default function CompanySettingsPage() {
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">{t("company_settings_created")}</p>
               <p className="mt-1 text-sm">
-                {company?.created_at
-                  ? new Date(company.created_at).toLocaleDateString()
-                  : "—"}
+                {utcToLocalDateDisplay(company?.created_at)}
               </p>
             </div>
           </div>

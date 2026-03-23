@@ -51,6 +51,7 @@ import type {
   TrackResponse,
   PaginatedResponse,
 } from "@/types";
+import { utcToLocalDisplay, utcToLocalTimeDisplay } from "@/lib/date-utils";
 
 export default function LoadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -349,7 +350,7 @@ export default function LoadDetailPage() {
               {load.pickup_at && (
                 <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                   <Clock size={10} />
-                  {new Date(load.pickup_at).toLocaleString()}
+                  {utcToLocalDisplay(load.pickup_at)}
                 </p>
               )}
             </section>
@@ -371,7 +372,7 @@ export default function LoadDetailPage() {
               {load.dropoff_at && (
                 <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                   <Clock size={10} />
-                  {new Date(load.dropoff_at).toLocaleString()}
+                  {utcToLocalDisplay(load.dropoff_at)}
                 </p>
               )}
             </section>
@@ -429,7 +430,7 @@ export default function LoadDetailPage() {
                   {isTrackable && position?.recorded_at && (
                     <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                       <Clock size={10} />
-                      Last update: {new Date(position.recorded_at).toLocaleTimeString()}
+                      Last update: {utcToLocalTimeDisplay(position.recorded_at)}
                     </p>
                   )}
                 </div>
@@ -464,11 +465,11 @@ export default function LoadDetailPage() {
               <div className="space-y-1 text-sm">
                 <p>
                   <span className="text-muted-foreground">{t("load_detail_created")}:</span>{" "}
-                  {load.created_at ? new Date(load.created_at).toLocaleString() : "—"}
+                  {utcToLocalDisplay(load.created_at)}
                 </p>
                 <p>
                   <span className="text-muted-foreground">Updated:</span>{" "}
-                  {load.updated_at ? new Date(load.updated_at).toLocaleString() : "—"}
+                  {utcToLocalDisplay(load.updated_at)}
                 </p>
               </div>
             </section>

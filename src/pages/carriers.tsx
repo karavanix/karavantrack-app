@@ -32,6 +32,7 @@ import { Truck, Plus, Trash2, AlertCircle, Search, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Carrier, GetCarrierByContactResponse, InviteResponse } from "@/types";
+import { utcToLocalDateDisplay } from "@/lib/date-utils";
 
 export default function CarriersPage() {
   const { selectedCompanyId, hasPermission } = useCompanyStore();
@@ -213,7 +214,7 @@ export default function CarriersPage() {
     {
       accessorKey: "created_at",
       header: t("carriers_col_added"),
-      cell: ({ row }) => row.original.created_at ? new Date(row.original.created_at).toLocaleDateString() : "—",
+      cell: ({ row }) => utcToLocalDateDisplay(row.original.created_at),
     },
     ...(canDelete
       ? [
