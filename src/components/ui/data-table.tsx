@@ -10,12 +10,14 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   emptyMessage?: string;
+  onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   emptyMessage = "No data found.",
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -47,8 +49,10 @@ export function DataTable<TData, TValue>({
             table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
+                onClick={() => onRowClick?.(row.original)}
                 className={cn(
-                  "border-b transition-colors hover:bg-muted/50 last:border-0"
+                  "border-b transition-colors hover:bg-muted/50 last:border-0",
+                  onRowClick && "cursor-pointer"
                 )}
               >
                 {row.getVisibleCells().map((cell) => (
