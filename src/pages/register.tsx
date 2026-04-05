@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Truck, AlertCircle } from "lucide-react";
+import { Truck, AlertCircle, CheckSquare, Square } from "lucide-react";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -23,6 +23,7 @@ export default function RegisterPage() {
     confirmPassword: "",
   });
   const [error, setError] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -38,6 +39,11 @@ export default function RegisterPage() {
 
     if (form.password.length < 6) {
       setError(t("register_error_password_length"));
+      return;
+    }
+
+    if (!termsAccepted) {
+      setError(t("register_error_terms"));
       return;
     }
 
@@ -162,6 +168,41 @@ export default function RegisterPage() {
                   required
                   autoComplete="new-password"
                 />
+              </div>
+
+              {/* Terms & Privacy checkbox */}
+              <div
+                id="terms-agreement"
+                className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/30 p-3 cursor-pointer select-none"
+                onClick={() => setTermsAccepted((v) => !v)}
+              >
+                <div className="mt-0.5 shrink-0 text-primary">
+                  {termsAccepted ? (
+                    <CheckSquare size={18} className="text-primary" />
+                  ) : (
+                    <Square size={18} className="text-muted-foreground" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {t("register_terms_agree")}{" "}
+                  <Link
+                    to="/terms-of-service"
+                    target="_blank"
+                    className="font-medium text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {t("register_terms_link")}
+                  </Link>
+                  {" "}{t("register_and")}{" "}
+                  <Link
+                    to="/privacy-policy"
+                    target="_blank"
+                    className="font-medium text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {t("register_privacy_link")}
+                  </Link>
+                </p>
               </div>
 
               <Button type="submit" className="w-full" disabled={isLoading}>

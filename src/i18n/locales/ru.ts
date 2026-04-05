@@ -54,6 +54,11 @@ const ru = {
   register_sign_in: "Войти",
   register_error_password_match: "Пароли не совпадают",
   register_error_password_length: "Пароль должен содержать не менее 6 символов",
+  register_error_terms: "Необходимо согласиться с условиями использования",
+  register_terms_agree: "Я принимаю",
+  register_terms_link: "Условия использования",
+  register_and: "и",
+  register_privacy_link: "Политику конфиденциальности",
 
   // Dashboard
   dashboard_title: "Панель управления",

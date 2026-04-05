@@ -54,6 +54,11 @@ const en = {
   register_sign_in: "Sign in",
   register_error_password_match: "Passwords don't match",
   register_error_password_length: "Password must be at least 6 characters",
+  register_error_terms: "You must agree to the Terms of Service to continue",
+  register_terms_agree: "I agree to the",
+  register_terms_link: "Terms of Service",
+  register_and: "and",
+  register_privacy_link: "Privacy Policy",
 
   // Dashboard
   dashboard_title: "Dashboard",

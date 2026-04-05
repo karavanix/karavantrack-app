@@ -54,6 +54,11 @@ const uz = {
   register_sign_in: "Kirish",
   register_error_password_match: "Parollar mos kelmaydi",
   register_error_password_length: "Parol kamida 6 ta belgidan iborat bo'lishi kerak",
+  register_error_terms: "Davom etish uchun foydalanish shartlariga rozilik berishingiz kerak",
+  register_terms_agree: "Men roziман",
+  register_terms_link: "Foydalanish shartlari",
+  register_and: "va",
+  register_privacy_link: "Maxfiylik siyosati",
 
   // Dashboard
   dashboard_title: "Boshqaruv paneli",

@@ -11,6 +11,7 @@ import {
   MapPin,
   Smartphone,
 } from "lucide-react";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 const EFFECTIVE_DATE = "April 5, 2026";
 const CONTACT_EMAIL = "support@yool.live";
@@ -38,13 +39,16 @@ function Layout({ children }: { children: React.ReactNode }) {
       <div className="relative overflow-hidden border-b border-border/50">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
         <div className="relative max-w-4xl mx-auto px-6 py-16 sm:py-24">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2.5 rounded-xl bg-primary/15 border border-primary/25">
-              <Shield className="w-6 h-6 text-primary" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/15 border border-primary/25">
+                <Shield className="w-6 h-6 text-primary" />
+              </div>
+              <span className="text-sm font-medium text-primary uppercase tracking-wider">
+                {APP_NAME}
+              </span>
             </div>
-            <span className="text-sm font-medium text-primary uppercase tracking-wider">
-              {APP_NAME}
-            </span>
+            <LanguageSwitcher />
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
             {children && (children as React.ReactElement[])[0]}
