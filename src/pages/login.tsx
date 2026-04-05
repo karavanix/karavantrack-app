@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Truck, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -38,12 +38,12 @@ export default function LoginPage() {
       </div>
 
       <div className="relative w-full max-w-md">
-        {/* Logo */}
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Truck size={28} />
+        {/* Logo as wordmark: [logo]ool */}
+        <div className="mb-8 flex flex-col items-center gap-2">
+          <div className="flex items-center">
+            <img src="/logo.svg" alt="Y" className="h-12 w-12" />
+            <span className="text-4xl font-bold tracking-tight -ml-1">ool</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("brand")}</h1>
           <p className="text-sm text-muted-foreground">{t("tagline_shipper")}</p>
         </div>
 

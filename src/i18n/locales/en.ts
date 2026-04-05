@@ -1,9 +1,9 @@
 const en = {
   // Brand
-  brand: "YoolLive",
+  brand: "Yool",
   tagline_shipper: "Shipment tracking platform",
   tagline_create: "Create your shipper account",
-  copyright: "© 2026 YoolLive",
+  copyright: "© 2026 Yool",
 
   // Nav
   nav_dashboard: "Dashboard",
@@ -84,7 +84,7 @@ const en = {
   dashboard_col_dropoff: "Dropoff",
   dashboard_col_created: "Created",
   dashboard_view: "View",
-  dashboard_welcome_title: "Welcome to YoolLive",
+  dashboard_welcome_title: "Welcome to Yool",
   dashboard_welcome_desc: "Start by creating your first company to begin managing loads and tracking shipments.",
   dashboard_welcome_action: "Create your first company",
   dashboard_no_company: "No company selected",

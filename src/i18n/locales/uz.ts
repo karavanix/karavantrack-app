@@ -1,9 +1,9 @@
 const uz = {
   // Brand
-  brand: "YoolLive",
+  brand: "Yool",
   tagline_shipper: "Yuk kuzatuv platformasi",
   tagline_create: "Jo'natuvchi hisobini yarating",
-  copyright: "© 2026 YoolLive",
+  copyright: "© 2026 Yool",
 
   // Nav
   nav_dashboard: "Boshqaruv paneli",
@@ -84,7 +84,7 @@ const uz = {
   dashboard_col_dropoff: "Tushirish",
   dashboard_col_created: "Yaratilgan",
   dashboard_view: "Ko'rish",
-  dashboard_welcome_title: "YoolLive'ga xush kelibsiz",
+  dashboard_welcome_title: "Yool'ga xush kelibsiz",
   dashboard_welcome_desc: "Yuklar va yetkazib berishni boshqarish uchun avval kompaniya yarating.",
   dashboard_welcome_action: "Birinchi kompaniyani yaratish",
   dashboard_no_company: "Kompaniya tanlanmagan",

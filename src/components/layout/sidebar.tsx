@@ -52,12 +52,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <TruckIcon size={20} />
+        {/* Logo wordmark: [logo]ool */}
+        <div className="flex h-16 items-center border-b border-sidebar-border px-4">
+          <div className="flex items-center">
+            <img src="/logo.svg" alt="Y" className="h-8 w-8 shrink-0" />
+            <span className="text-xl font-bold tracking-tight -ml-0.5">ool</span>
           </div>
-          <span className="text-lg font-bold tracking-tight">{t("brand")}</span>
         </div>
 
         {/* Navigation */}

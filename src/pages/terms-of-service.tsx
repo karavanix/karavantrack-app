@@ -16,8 +16,8 @@ import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 const EFFECTIVE_DATE = "April 5, 2026";
 const CONTACT_EMAIL = "support@yool.live";
-const APP_NAME = "YOOL";
-const COMPANY_NAME = "YOOL";
+const APP_NAME = "Yool";
+const COMPANY_NAME = "Yool";
 
 export default function TermsOfServicePage() {
   const { i18n } = useTranslation();

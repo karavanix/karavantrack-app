@@ -1,9 +1,9 @@
 const ru = {
   // Brand
-  brand: "YoolLive",
+  brand: "Yool",
   tagline_shipper: "Платформа отслеживания грузов",
   tagline_create: "Создайте аккаунт отправителя",
-  copyright: "© 2026 YoolLive",
+  copyright: "© 2026 Yool",
 
   // Nav
   nav_dashboard: "Панель",
@@ -84,7 +84,7 @@ const ru = {
   dashboard_col_dropoff: "Куда",
   dashboard_col_created: "Создан",
   dashboard_view: "Просмотр",
-  dashboard_welcome_title: "Добро пожаловать в YoolLive",
+  dashboard_welcome_title: "Добро пожаловать в Yool",
   dashboard_welcome_desc: "Начните с создания первой компании для управления грузами и отслеживания доставок.",
   dashboard_welcome_action: "Создать первую компанию",
   dashboard_no_company: "Компания не выбрана",
