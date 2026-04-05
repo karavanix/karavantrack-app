@@ -10,6 +10,8 @@ import CarriersPage from "@/pages/carriers";
 import CreateLoadPage from "@/pages/create-load";
 import LoadDetailPage from "@/pages/load-detail";
 import ProfilePage from "@/pages/profile";
+import PrivacyPolicyPage from "@/pages/privacy-policy";
+import TermsOfServicePage from "@/pages/terms-of-service";
 
 export function AppRouter() {
   return (
@@ -18,6 +20,8 @@ export function AppRouter() {
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-of-service" element={<TermsOfServicePage />} />
 
         {/* Protected routes */}
         <Route element={<AppLayout />}>
