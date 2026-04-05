@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
 import { Package, Plus, Building2, Eye, RefreshCw } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Load, LoadStats, PaginatedResponse } from "@/types";
+import type { Carrier, Load, LoadStats, PaginatedResponse } from "@/types";
 import { utcToLocalDateDisplay } from "@/lib/date-utils";
 
 export default function DashboardPage() {
@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const { selectedCompanyId, companies } = useCompanyStore();
   const [loads, setLoads] = useState<Load[]>([]);
   const [stats, setStats] = useState<LoadStats | null>(null);
+  const [carrierMap, setCarrierMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("all");
@@ -42,8 +43,8 @@ export default function DashboardPage() {
       const loadsParams: Record<string, string | number | string[]> = { limit: 100, offset: 0 };
       if (activeTab !== "all") loadsParams.status = [activeTab];
 
-      // Fetch loads and stats in parallel from the dedicated stats endpoint
-      const [loadsRes, statsRes] = await Promise.all([
+      // Fetch loads, stats, and carriers in parallel
+      const [loadsRes, statsRes, carriersRes] = await Promise.all([
         api.get<PaginatedResponse<Load> | Load[]>(
           `/companies/${selectedCompanyId}/loads`,
           {
@@ -62,10 +63,20 @@ export default function DashboardPage() {
           }
         ),
         api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`),
+        api.get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`),
       ]);
 
       setLoads(Array.isArray(loadsRes.data) ? loadsRes.data : (loadsRes.data?.result ?? []));
       setStats(statsRes.data);
+
+      const carrierList = Array.isArray(carriersRes.data)
+        ? carriersRes.data
+        : (carriersRes.data?.result ?? []);
+      const map: Record<string, string> = {};
+      for (const c of carrierList) {
+        map[c.carrier_id] = c.alias || `${c.first_name} ${c.last_name}`.trim();
+      }
+      setCarrierMap(map);
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -99,6 +110,18 @@ export default function DashboardPage() {
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
+      accessorKey: "carrier_id",
+      header: t("dashboard_col_carrier"),
+      cell: ({ row }) => {
+        const name = row.original.carrier_id ? carrierMap[row.original.carrier_id] : null;
+        return (
+          <span className="text-sm text-muted-foreground">
+            {name ?? (row.original.carrier_id ? "—" : "—")}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: "pickup_address",
       header: t("dashboard_col_pickup"),
       cell: ({ row }) => (
@@ -130,7 +153,7 @@ export default function DashboardPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/loads/${row.original.id}`)}
+          onClick={(e) => { e.stopPropagation(); navigate(`/loads/${row.original.id}`); }}
           className="gap-1"
         >
           <Eye size={14} />
@@ -175,18 +198,21 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Stats cards — sourced from /companies/{id}/loads/stats */}
+      {/* Stats cards — clickable to filter the table by status */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: t("dashboard_stat_active"), value: stats?.active, color: "text-info" },
-          { label: t("dashboard_stat_pending"), value: stats?.pending, color: "text-warning" },
-          { label: t("dashboard_stat_completed"), value: stats?.completed, color: "text-success" },
-          { label: t("dashboard_stat_cancelled"), value: stats?.canceled, color: "text-destructive" },
-          { label: t("dashboard_stat_total"), value: stats?.total, color: "text-foreground" },
+          { label: t("dashboard_stat_active"), value: stats?.active, color: "text-info", tab: "in_transit" },
+          { label: t("dashboard_stat_pending"), value: stats?.pending, color: "text-warning", tab: "created" },
+          { label: t("dashboard_stat_completed"), value: stats?.completed, color: "text-success", tab: "completed" },
+          { label: t("dashboard_stat_cancelled"), value: stats?.canceled, color: "text-destructive", tab: "cancelled" },
+          { label: t("dashboard_stat_total"), value: stats?.total, color: "text-foreground", tab: "all" },
         ].map((stat) => (
           <div
             key={stat.label}
-            className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md"
+            onClick={() => setActiveTab(stat.tab)}
+            className={`rounded-xl border bg-card p-5 cursor-pointer transition-all hover:shadow-md hover:border-primary/40 ${
+              activeTab === stat.tab ? "border-primary/60 shadow-sm" : ""
+            }`}
           >
             <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
             <p className={`mt-1 text-3xl font-bold ${stat.color}`}>
@@ -245,7 +271,11 @@ export default function DashboardPage() {
                 }
               />
             ) : (
-              <DataTable columns={columns} data={loads} />
+              <DataTable
+                columns={columns}
+                data={loads}
+                onRowClick={(load) => navigate(`/loads/${load.id}`)}
+              />
             )}
           </TabsContent>
         ))}

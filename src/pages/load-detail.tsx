@@ -42,7 +42,10 @@ import {
   Radio,
   Gauge,
   Clock,
+  Search,
+  Timer,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import type {
   Load,
   Carrier,
@@ -52,6 +55,18 @@ import type {
   PaginatedResponse,
 } from "@/types";
 import { utcToLocalDisplay, utcToLocalTimeDisplay } from "@/lib/date-utils";
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export default function LoadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -69,23 +84,21 @@ export default function LoadDetailPage() {
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [carriersLoading, setCarriersLoading] = useState(false);
   const [selectedCarrierId, setSelectedCarrierId] = useState("");
+  const [assignCarrierSearch, setAssignCarrierSearch] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [assignedCarrier, setAssignedCarrier] = useState<Carrier | null>(null);
 
   const isTrackable =
     load != null && ["assigned", "accepted", "in_transit"].includes(load.status);
 
-  const { isConnected, lastPosition } = useLoadPositionWS({
+  const { isConnected } = useLoadPositionWS({
     loadId: id,
     enabled: !!isTrackable,
     onPosition: (pos) => setPosition(pos),
   });
-
-  useEffect(() => {
-    if (lastPosition) {
-      setPosition(lastPosition);
-    }
-  }, [lastPosition]);
 
   const fetchLoad = useCallback(async () => {
     if (!id) return;
@@ -125,6 +138,26 @@ export default function LoadDetailPage() {
     fetchLoad();
   }, [fetchLoad]);
 
+  // Resolve carrier name from carrier_id — check local state first, then fetch
+  useEffect(() => {
+    if (!load?.carrier_id || !selectedCompanyId) {
+      setAssignedCarrier(null);
+      return;
+    }
+    const cached = carriers.find((c) => c.carrier_id === load.carrier_id);
+    if (cached) {
+      setAssignedCarrier(cached);
+      return;
+    }
+    api
+      .get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`)
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : (data?.result ?? []);
+        setAssignedCarrier(list.find((c) => c.carrier_id === load.carrier_id) ?? null);
+      })
+      .catch(() => setAssignedCarrier(null));
+  }, [load?.carrier_id, selectedCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fetchCarriers = async () => {
     if (!selectedCompanyId) return;
 
@@ -162,22 +195,28 @@ export default function LoadDetailPage() {
   const handleCancel = async () => {
     if (!id) return;
     setActionError("");
+    setCancelLoading(true);
     try {
       await api.post(`/loads/${id}/cancel`);
       await fetchLoad();
     } catch (err) {
       setActionError(getApiErrorMessage(err));
+    } finally {
+      setCancelLoading(false);
     }
   };
 
   const handleConfirm = async () => {
     if (!id) return;
     setActionError("");
+    setConfirmLoading(true);
     try {
       await api.post(`/loads/${id}/confirm`);
       await fetchLoad();
     } catch (err) {
       setActionError(getApiErrorMessage(err));
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -247,7 +286,7 @@ export default function LoadDetailPage() {
                 {isTrackable && (
                   <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
                     <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
-                    {isConnected ? "Live" : t("common_error")}
+                    {isConnected ? "Live" : t("load_detail_ws_offline")}
                   </Badge>
                 )}
               </div>
@@ -269,10 +308,15 @@ export default function LoadDetailPage() {
               <Button
                 size="sm"
                 onClick={handleConfirm}
+                disabled={confirmLoading}
                 className="gap-1 bg-success hover:bg-success/90"
               >
-                <CheckCircle2 size={14} />
-                Confirm Delivery
+                {confirmLoading ? (
+                  <Spinner size={14} className="text-primary-foreground" />
+                ) : (
+                  <CheckCircle2 size={14} />
+                )}
+                {t("load_detail_confirm_delivery")}
               </Button>
             )}
             {canCancel && (
@@ -287,15 +331,17 @@ export default function LoadDetailPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>{t("load_detail_cancel_load")}?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will cancel the load. This action can&apos;t be undone.
+                      {t("load_detail_cancel_confirm_desc")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>{t("common_cancel")}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleCancel}
+                      disabled={cancelLoading}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
+                      {cancelLoading && <Spinner size={14} className="text-destructive-foreground" />}
                       {t("load_detail_cancel_load")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -389,48 +435,92 @@ export default function LoadDetailPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
-                      <Truck size={14} />
+                      {assignedCarrier ? (
+                        <span>
+                          {assignedCarrier.first_name?.[0]}
+                          {assignedCarrier.last_name?.[0]}
+                        </span>
+                      ) : (
+                        <Truck size={14} />
+                      )}
                     </div>
-                    <code className="text-sm truncate">{load.carrier_id}</code>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {assignedCarrier
+                          ? assignedCarrier.alias ||
+                            `${assignedCarrier.first_name} ${assignedCarrier.last_name}`.trim()
+                          : load.carrier_id}
+                      </p>
+                      {assignedCarrier?.alias && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {assignedCarrier.first_name} {assignedCarrier.last_name}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Live telemetry */}
-                  {isTrackable && position && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                          <Gauge size={11} />
-                          <span className="text-[10px] uppercase">Speed</span>
+                  {isTrackable && position && (() => {
+                    const etaMinutes =
+                      dropoff && (position.speed_mps ?? 0) > 0.5
+                        ? Math.round(
+                            (haversineKm(position.lat, position.lng, dropoff.lat, dropoff.lng) /
+                              (position.speed_mps * 3.6)) *
+                              60
+                          )
+                        : null;
+                    return (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                            <Gauge size={11} />
+                            <span className="text-[10px] uppercase">{t("load_detail_telemetry_speed")}</span>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums">
+                            {speedKmh} <span className="text-[10px] font-normal text-muted-foreground">km/h</span>
+                          </p>
                         </div>
-                        <p className="text-sm font-bold tabular-nums">
-                          {speedKmh} <span className="text-[10px] font-normal text-muted-foreground">km/h</span>
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                          <Navigation size={11} />
-                          <span className="text-[10px] uppercase">Heading</span>
+                        <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                            <Navigation size={11} />
+                            <span className="text-[10px] uppercase">{t("load_detail_telemetry_heading")}</span>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums">
+                            {Math.round(position.heading_deg)}°
+                          </p>
                         </div>
-                        <p className="text-sm font-bold tabular-nums">
-                          {Math.round(position.heading_deg)}°
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                          <Radio size={11} />
-                          <span className="text-[10px] uppercase">Accuracy</span>
+                        <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                            <Radio size={11} />
+                            <span className="text-[10px] uppercase">{t("load_detail_telemetry_accuracy")}</span>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums">
+                            {Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">m</span>
+                          </p>
                         </div>
-                        <p className="text-sm font-bold tabular-nums">
-                          {Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">m</span>
-                        </p>
+                        <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                            <Timer size={11} />
+                            <span className="text-[10px] uppercase">{t("load_detail_eta")}</span>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums">
+                            {etaMinutes === null
+                              ? "—"
+                              : etaMinutes < 1
+                              ? t("load_detail_eta_soon")
+                              : etaMinutes < 60
+                              ? `~${etaMinutes}m`
+                              : `~${Math.floor(etaMinutes / 60)}h ${etaMinutes % 60}m`}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {isTrackable && position?.recorded_at && (
                     <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                       <Clock size={10} />
-                      Last update: {utcToLocalTimeDisplay(position.recorded_at)}
+                      {t("load_detail_last_update")} {utcToLocalTimeDisplay(position.recorded_at)}
                     </p>
                   )}
                 </div>
@@ -460,7 +550,7 @@ export default function LoadDetailPage() {
             <section className="space-y-1.5">
               <h2 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <Calendar size={12} />
-                Timeline
+                {t("load_detail_timeline")}
               </h2>
               <div className="space-y-1 text-sm">
                 <p>
@@ -468,7 +558,7 @@ export default function LoadDetailPage() {
                   {utcToLocalDisplay(load.created_at)}
                 </p>
                 <p>
-                  <span className="text-muted-foreground">Updated:</span>{" "}
+                  <span className="text-muted-foreground">{t("load_detail_updated")}:</span>{" "}
                   {utcToLocalDisplay(load.updated_at)}
                 </p>
               </div>
@@ -478,12 +568,12 @@ export default function LoadDetailPage() {
       </div>
 
       {/* ── Assign Carrier Dialog ── */}
-      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+      <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) { setAssignCarrierSearch(""); setSelectedCarrierId(""); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t("load_detail_assign_carrier")}</DialogTitle>
             <DialogDescription>
-              Select a carrier from your company to assign to this load.
+              {t("load_detail_assign_dialog_desc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -500,7 +590,7 @@ export default function LoadDetailPage() {
             </div>
           ) : carriers.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              No carriers in this company.{" "}
+              {t("load_detail_no_carriers")}{" "}
               <button
                 type="button"
                 className="text-primary hover:underline"
@@ -509,49 +599,72 @@ export default function LoadDetailPage() {
                   navigate("/carriers");
                 }}
               >
-                Add one first
+                {t("load_detail_add_carrier_link")}
               </button>
             </p>
-          ) : (
-            <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border p-1">
-              {carriers.map((carrier) => (
-                <button
-                  key={carrier.carrier_id}
-                  type="button"
-                  onClick={() => setSelectedCarrierId(carrier.carrier_id)}
-                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
-                    selectedCarrierId === carrier.carrier_id
-                      ? "bg-primary/10 text-primary"
-                      : "hover:bg-muted"
-                  }`}
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                    {carrier.first_name?.[0]}
-                    {carrier.last_name?.[0]}
-                  </div>
-
-                  <div>
-                    <p className="font-medium">
-                      {carrier.alias ||
-                        `${carrier.first_name} ${carrier.last_name}`.trim()}
+          ) : (() => {
+            const q = assignCarrierSearch.toLowerCase();
+            const filtered = q
+              ? carriers.filter((c) => {
+                  const name = `${c.first_name} ${c.last_name}`.toLowerCase();
+                  return name.includes(q) || c.alias?.toLowerCase().includes(q);
+                })
+              : carriers;
+            return (
+              <>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder={t("load_detail_carrier_search_placeholder")}
+                    value={assignCarrierSearch}
+                    onChange={(e) => setAssignCarrierSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border p-1">
+                  {filtered.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-muted-foreground">
+                      {t("load_detail_carrier_no_results")}
                     </p>
-
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground">
-                        {carrier.first_name} {carrier.last_name}
-                      </p>
-                      <Badge
-                        variant={carrier.is_free ? "success" : "secondary"}
-                        className="px-1.5 py-0 text-[10px]"
+                  ) : (
+                    filtered.map((carrier) => (
+                      <button
+                        key={carrier.carrier_id}
+                        type="button"
+                        onClick={() => setSelectedCarrierId(carrier.carrier_id)}
+                        className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
+                          selectedCarrierId === carrier.carrier_id
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-muted"
+                        }`}
                       >
-                        {carrier.is_free ? "Available" : "Busy"}
-                      </Badge>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                          {carrier.first_name?.[0]}
+                          {carrier.last_name?.[0]}
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {carrier.alias || `${carrier.first_name} ${carrier.last_name}`.trim()}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground">
+                              {carrier.first_name} {carrier.last_name}
+                            </p>
+                            <Badge
+                              variant={carrier.is_free ? "success" : "secondary"}
+                              className="px-1.5 py-0 text-[10px]"
+                            >
+                              {carrier.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+                            </Badge>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignOpen(false)}>
