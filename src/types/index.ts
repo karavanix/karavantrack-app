@@ -188,8 +188,12 @@ export type LoadStatus =
   | "created"
   | "assigned"
   | "accepted"
+  | "picking_up"
+  | "picked_up"
   | "in_transit"
-  | "completed"
+  | "dropping_off"
+  | "dropped_off"
+  | "completed"      // keep for backward compat
   | "confirmed"
   | "cancelled";
 
@@ -285,9 +289,15 @@ export interface LoadListParams extends PaginationParams {
 
 // ──── Dashboard Stats ────
 export interface LoadStats {
-  active: number;
-  pending: number;
-  completed: number;
-  canceled: number;
+  created: number;
+  assigned: number;
+  accepted: number;
+  picking_up: number;
+  picked_up: number;
+  in_transit: number;
+  dropping_off: number;
+  dropped_off: number;
+  confirmed: number;
+  canceled: number;  // API spells it this way
   total: number;
 }

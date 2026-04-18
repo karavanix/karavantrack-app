@@ -9,30 +9,60 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
-import { Package, Plus, Building2, Eye, RefreshCw } from "lucide-react";
+import { LoadKanban } from "@/components/loads/load-kanban";
+import { CreateLoadModal } from "@/components/loads/create-load-modal";
+import {
+  Package,
+  Plus,
+  Building2,
+  Eye,
+  RefreshCw,
+  LayoutGrid,
+  List,
+} from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Carrier, Load, LoadStats, PaginatedResponse } from "@/types";
 import { utcToLocalDateDisplay } from "@/lib/date-utils";
+
+type ViewMode = "kanban" | "list";
+
+const LS_VIEW_MODE_KEY = "dashboard_view_mode";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { selectedCompanyId, companies } = useCompanyStore();
+
   const [loads, setLoads] = useState<Load[]>([]);
   const [stats, setStats] = useState<LoadStats | null>(null);
   const [carrierMap, setCarrierMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem(LS_VIEW_MODE_KEY);
+    return saved === "list" ? "list" : "kanban";
+  });
+
+  // Persist view mode preference
+  const handleSetViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem(LS_VIEW_MODE_KEY, mode);
+  };
 
   const STATUS_TABS = [
-    { value: "all", label: t("dashboard_tab_all") },
-    { value: "created", label: t("dashboard_tab_created") },
-    { value: "assigned", label: t("dashboard_tab_assigned") },
-    { value: "in_transit", label: t("dashboard_tab_in_transit") },
-    { value: "completed", label: t("dashboard_tab_completed") },
-    { value: "confirmed", label: t("dashboard_tab_confirmed") },
-    { value: "cancelled", label: t("dashboard_tab_cancelled") },
+    { value: "all",          label: t("dashboard_tab_all") },
+    { value: "created",      label: t("dashboard_tab_created") },
+    { value: "assigned",     label: t("dashboard_tab_assigned") },
+    { value: "accepted",     label: "Accepted" },
+    { value: "picking_up",   label: t("status_picking_up") },
+    { value: "picked_up",    label: t("status_picked_up") },
+    { value: "in_transit",   label: t("dashboard_tab_in_transit") },
+    { value: "dropping_off", label: t("status_dropping_off") },
+    { value: "dropped_off",  label: t("status_dropped_off") },
+    { value: "confirmed",    label: t("dashboard_tab_confirmed") },
+    { value: "cancelled",    label: t("dashboard_tab_cancelled") },
   ] as const;
 
   const fetchData = useCallback(async () => {
@@ -40,10 +70,11 @@ export default function DashboardPage() {
     setIsLoading(true);
     setError("");
     try {
-      const loadsParams: Record<string, string | number | string[]> = { limit: 100, offset: 0 };
-      if (activeTab !== "all") loadsParams.status = [activeTab];
+      // In kanban mode: always fetch all loads so all columns are populated
+      // In list mode: filter by active tab
+      const loadsParams: Record<string, string | number | string[]> = { limit: 200, offset: 0 };
+      if (viewMode === "list" && activeTab !== "all") loadsParams.status = [activeTab];
 
-      // Fetch loads, stats, and carriers in parallel
       const [loadsRes, statsRes, carriersRes] = await Promise.all([
         api.get<PaginatedResponse<Load> | Load[]>(
           `/companies/${selectedCompanyId}/loads`,
@@ -82,15 +113,15 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCompanyId, activeTab]);
+  }, [selectedCompanyId, activeTab, viewMode]);
 
   useEffect(() => {
     fetchData();
-    // Auto-reload every 60 seconds
     const interval = setInterval(fetchData, 60_000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // ── Table columns ──
   const columns: ColumnDef<Load>[] = [
     {
       accessorKey: "reference_id",
@@ -114,11 +145,7 @@ export default function DashboardPage() {
       header: t("dashboard_col_carrier"),
       cell: ({ row }) => {
         const name = row.original.carrier_id ? carrierMap[row.original.carrier_id] : null;
-        return (
-          <span className="text-sm text-muted-foreground">
-            {name ?? (row.original.carrier_id ? "—" : "—")}
-          </span>
-        );
+        return <span className="text-sm text-muted-foreground">{name ?? "—"}</span>;
       },
     },
     {
@@ -163,6 +190,7 @@ export default function DashboardPage() {
     },
   ];
 
+  // ── Empty / no-company states ──
   if (companies.length === 0) {
     return (
       <EmptyState
@@ -185,62 +213,55 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("dashboard_title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("dashboard_subtitle")}</p>
-        </div>
-        <Button onClick={() => navigate("/loads/new")}>
-          <Plus size={16} />
-          {t("dashboard_new_load")}
-        </Button>
-      </div>
-
-      {/* Stats cards — clickable to filter the table by status */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {[
-          { label: t("dashboard_stat_active"), value: stats?.active, color: "text-info", tab: "in_transit" },
-          { label: t("dashboard_stat_pending"), value: stats?.pending, color: "text-warning", tab: "created" },
-          { label: t("dashboard_stat_completed"), value: stats?.completed, color: "text-success", tab: "completed" },
-          { label: t("dashboard_stat_cancelled"), value: stats?.canceled, color: "text-destructive", tab: "cancelled" },
-          { label: t("dashboard_stat_total"), value: stats?.total, color: "text-foreground", tab: "all" },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            onClick={() => setActiveTab(stat.tab)}
-            className={`rounded-xl border bg-card p-5 cursor-pointer transition-all hover:shadow-md hover:border-primary/40 ${
-              activeTab === stat.tab ? "border-primary/60 shadow-sm" : ""
-            }`}
-          >
-            <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-            <p className={`mt-1 text-3xl font-bold ${stat.color}`}>
-              {stat.value ?? (isLoading ? <Spinner size={20} /> : "—")}
-            </p>
+    <>
+      <div className="space-y-5">
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{t("dashboard_title")}</h1>
+            <p className="text-sm text-muted-foreground">{t("dashboard_subtitle")}</p>
           </div>
-        ))}
-      </div>
+          <Button id="new-load-btn" onClick={() => setCreateModalOpen(true)} className="gap-1.5">
+            <Plus size={16} />
+            {t("dashboard_new_load")}
+          </Button>
+        </div>
 
-      {error && (
-        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
-      )}
+        {/* ── View toggle + Reload ── */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center rounded-lg border overflow-hidden">
+            <button
+              id="view-kanban-btn"
+              type="button"
+              onClick={() => handleSetViewMode("kanban")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
+                viewMode === "kanban"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <LayoutGrid size={15} />
+              {t("dashboard_view_kanban")}
+            </button>
+            <button
+              id="view-list-btn"
+              type="button"
+              onClick={() => handleSetViewMode("list")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
+                viewMode === "list"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <List size={15} />
+              {t("dashboard_view_list")}
+            </button>
+          </div>
 
-      {/* Loads table with tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between mb-4">
-          <TabsList className="flex-wrap">
-            {STATUS_TABS.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}>
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={fetchData} 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchData}
             disabled={isLoading}
             className="gap-2"
           >
@@ -249,37 +270,72 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {STATUS_TABS.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value}>
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Spinner size={24} />
-              </div>
-            ) : loads.length === 0 ? (
-              <EmptyState
-                icon={<Package size={32} />}
-                title={t("dashboard_no_loads")}
-                description={
-                  activeTab === "all"
-                    ? t("dashboard_no_loads_desc_all")
-                    : t("dashboard_no_loads_desc_status", { status: tab.label })
-                }
-                action={
-                  activeTab === "all"
-                    ? { label: t("dashboard_create_load"), onClick: () => navigate("/loads/new") }
-                    : undefined
-                }
-              />
-            ) : (
-              <DataTable
-                columns={columns}
-                data={loads}
-                onRowClick={(load) => navigate(`/loads/${load.id}`)}
-              />
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
-    </div>
+        {/* ── Error banner ── */}
+        {error && (
+          <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+        )}
+
+        {/* ── Kanban view ── */}
+        {viewMode === "kanban" && (
+          <LoadKanban
+            loads={loads}
+            stats={stats}
+            carrierMap={carrierMap}
+            isLoading={isLoading}
+          />
+        )}
+
+        {/* ── List view ── */}
+        {viewMode === "list" && (
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="flex-wrap h-auto gap-1">
+              {STATUS_TABS.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {STATUS_TABS.map((tab) => (
+              <TabsContent key={tab.value} value={tab.value} className="mt-4">
+                {isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <Spinner size={24} />
+                  </div>
+                ) : loads.length === 0 ? (
+                  <EmptyState
+                    icon={<Package size={32} />}
+                    title={t("dashboard_no_loads")}
+                    description={
+                      activeTab === "all"
+                        ? t("dashboard_no_loads_desc_all")
+                        : t("dashboard_no_loads_desc_status", { status: tab.label })
+                    }
+                    action={
+                      activeTab === "all"
+                        ? { label: t("dashboard_create_load"), onClick: () => setCreateModalOpen(true) }
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <DataTable
+                    columns={columns}
+                    data={loads}
+                    onRowClick={(load) => navigate(`/loads/${load.id}`)}
+                  />
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
+      </div>
+
+      {/* ── Create Load Modal ── */}
+      <CreateLoadModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSuccess={fetchData}
+      />
+    </>
   );
 }

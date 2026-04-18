@@ -7,7 +7,6 @@ import CreateCompanyPage from "@/pages/create-company";
 import CompanySettingsPage from "@/pages/company-settings";
 import MembersPage from "@/pages/members";
 import CarriersPage from "@/pages/carriers";
-import CreateLoadPage from "@/pages/create-load";
 import LoadDetailPage from "@/pages/load-detail";
 import ProfilePage from "@/pages/profile";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
@@ -27,7 +26,7 @@ export function AppRouter() {
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="/loads" element={<DashboardPage />} />
-          <Route path="/loads/new" element={<CreateLoadPage />} />
+          <Route path="/loads/new" element={<Navigate to="/" replace />} />
           <Route path="/loads/:id" element={<LoadDetailPage />} />
           <Route path="/carriers" element={<CarriersPage />} />
           <Route path="/members" element={<MembersPage />} />

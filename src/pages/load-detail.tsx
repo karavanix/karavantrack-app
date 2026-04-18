@@ -91,8 +91,13 @@ export default function LoadDetailPage() {
   const [actionError, setActionError] = useState("");
   const [assignedCarrier, setAssignedCarrier] = useState<Carrier | null>(null);
 
-  const isTrackable =
-    load != null && ["assigned", "accepted", "in_transit"].includes(load.status);
+  const TRACKABLE_STATUSES = [
+    "assigned", "accepted",
+    "picking_up", "picked_up",
+    "in_transit",
+    "dropping_off", "dropped_off",
+  ];
+  const isTrackable = load != null && TRACKABLE_STATUSES.includes(load.status);
 
   const { isConnected } = useLoadPositionWS({
     loadId: id,
@@ -110,7 +115,7 @@ export default function LoadDetailPage() {
       const { data } = await api.get<Load>(`/loads/${id}`);
       setLoad(data);
 
-      if (["assigned", "accepted", "in_transit"].includes(data.status)) {
+      if (["assigned", "accepted", "picking_up", "picked_up", "in_transit", "dropping_off", "dropped_off"].includes(data.status)) {
         try {
           const posRes = await api.get<Position>(`/loads/${id}/position`);
           setPosition(posRes.data);
@@ -246,7 +251,7 @@ export default function LoadDetailPage() {
 
   const canAssign = load.status === "created";
   const canCancel = ["created", "assigned"].includes(load.status);
-  const canConfirm = load.status === "completed";
+  const canConfirm = load.status === "dropped_off" || load.status === "completed"; // backward compat
 
   const pickup =
     load.pickup_lat != null && load.pickup_lng != null
