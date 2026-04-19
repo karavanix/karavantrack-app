@@ -1,69 +1,87 @@
-import { useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { LoadCard } from "@/components/loads/load-card";
+import { LoadDetailModal } from "@/components/loads/load-detail-modal";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 import type { Load, LoadStats } from "@/types";
 
-// Column definitions with phase grouping
-const KANBAN_COLUMNS = [
-  // Planning phase
-  { status: "created",      label: "Created",      group: "Planning" },
-  { status: "assigned",     label: "Assigned",     group: "Planning" },
-  { status: "accepted",     label: "Accepted",     group: "Planning" },
-  // Pickup phase
-  { status: "picking_up",   label: "Picking Up",   group: "Pickup" },
-  { status: "picked_up",    label: "Picked Up",    group: "Pickup" },
-  // Transit phase
-  { status: "in_transit",   label: "In Transit",   group: "Transit" },
-  // Delivery phase
-  { status: "dropping_off", label: "Dropping Off", group: "Delivery" },
-  { status: "dropped_off",  label: "Dropped Off",  group: "Delivery" },
-  // Done
-  { status: "confirmed",    label: "Confirmed",    group: "Done" },
-] as const;
+export const PHASE_COLUMNS = [
+  {
+    label: "New",
+    statuses: ["created"],
+    statsKeys: ["created"] as (keyof LoadStats)[],
+    accent: "border-t-blue-400",
+  },
+  {
+    label: "Assigned",
+    statuses: ["assigned", "accepted"],
+    statsKeys: ["assigned", "accepted"] as (keyof LoadStats)[],
+    accent: "border-t-violet-400",
+  },
+  {
+    label: "Pickup",
+    statuses: ["picking_up", "picked_up"],
+    statsKeys: ["picking_up", "picked_up"] as (keyof LoadStats)[],
+    accent: "border-t-amber-400",
+  },
+  {
+    label: "In Transit",
+    statuses: ["in_transit", "dropping_off", "dropped_off"],
+    statsKeys: ["in_transit", "dropping_off", "dropped_off"] as (keyof LoadStats)[],
+    accent: "border-t-orange-400",
+  },
+  {
+    label: "Delivered",
+    statuses: ["confirmed"],
+    statsKeys: ["confirmed"] as (keyof LoadStats)[],
+    accent: "border-t-green-500",
+  },
+];
 
-type KanbanStatus = (typeof KANBAN_COLUMNS)[number]["status"];
-
-// Phase colour accent classes
-const GROUP_ACCENT: Record<string, string> = {
-  Planning:  "border-t-blue-400",
-  Pickup:    "border-t-amber-400",
-  Transit:   "border-t-orange-400",
-  Delivery:  "border-t-indigo-400",
-  Done:      "border-t-green-500",
-  Cancelled: "border-t-destructive",
-};
+export interface PhaseLoads {
+  loads: Load[];
+  hasMore: boolean;
+  loadingMore: boolean;
+}
 
 interface LoadKanbanProps {
-  loads: Load[];
+  phaseData: Record<string, PhaseLoads>;
+  cancelledLoads: Load[];
+  cancelledHasMore: boolean;
+  cancelledLoadingMore: boolean;
   stats: LoadStats | null;
   carrierMap: Record<string, string>;
   isLoading: boolean;
+  onLoadMore: (phaseLabel: string, currentOffset: number) => void;
+  onLoadMoreCancelled: (currentOffset: number) => void;
 }
 
-export function LoadKanban({ loads, stats, carrierMap, isLoading }: LoadKanbanProps) {
+function phaseCount(phase: (typeof PHASE_COLUMNS)[number], stats: LoadStats | null, localCount: number): number {
+  if (!stats) return localCount;
+  return phase.statsKeys.reduce((sum, key) => {
+    const val = stats[key];
+    return sum + (typeof val === "number" ? val : 0);
+  }, 0);
+}
+
+export function LoadKanban({
+  phaseData,
+  cancelledLoads,
+  cancelledHasMore,
+  cancelledLoadingMore,
+  stats,
+  carrierMap,
+  isLoading,
+  onLoadMore,
+  onLoadMoreCancelled,
+}: LoadKanbanProps) {
   const [cancelledOpen, setCancelledOpen] = useState(false);
+  const [quickViewId, setQuickViewId] = useState<string | null>(null);
 
-  // Group loads by status
-  const byStatus: Record<string, Load[]> = {};
-  for (const load of loads) {
-    if (!byStatus[load.status]) byStatus[load.status] = [];
-    byStatus[load.status].push(load);
-  }
-
-  const cancelledLoads = byStatus["cancelled"] ?? [];
   const cancelledCount = stats?.canceled ?? cancelledLoads.length;
 
-  // Derive count for a column: prefer stats (real-time from server), fall back to local array length
-  const colCount = (status: KanbanStatus): number => {
-    if (stats) {
-      const key = status as keyof LoadStats;
-      const val = stats[key];
-      return typeof val === "number" ? val : (byStatus[status]?.length ?? 0);
-    }
-    return byStatus[status]?.length ?? 0;
-  };
-
-  if (isLoading && loads.length === 0) {
+  if (isLoading && Object.keys(phaseData).length === 0) {
     return (
       <div className="flex justify-center py-20">
         <Spinner size={28} />
@@ -73,51 +91,50 @@ export function LoadKanban({ loads, stats, carrierMap, isLoading }: LoadKanbanPr
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-4 min-h-[60vh]">
-      {KANBAN_COLUMNS.map((col, idx) => {
-        const colLoads = byStatus[col.status] ?? [];
-        const count = colCount(col.status as KanbanStatus);
-        const accentClass = GROUP_ACCENT[col.group] ?? "";
-
-        // Show group label when group changes
-        const prevGroup = idx > 0 ? KANBAN_COLUMNS[idx - 1].group : null;
-        const isGroupStart = col.group !== prevGroup;
+      {PHASE_COLUMNS.map((phase) => {
+        const data = phaseData[phase.label] ?? { loads: [], hasMore: false, loadingMore: false };
+        const count = phaseCount(phase, stats, data.loads.length);
 
         return (
-          <div key={col.status} className="flex gap-3">
-            {/* Group separator line */}
-            {isGroupStart && idx > 0 && (
-              <div className="flex items-stretch">
-                <div className="w-px bg-border/50 my-2" />
-              </div>
-            )}
-            <div
-              className={`flex-shrink-0 w-[270px] flex flex-col rounded-xl border bg-muted/30 border-t-2 ${accentClass}`}
-            >
-              {/* Column header */}
-              <div className="px-3 py-2.5 flex items-center justify-between border-b border-border/50">
-                <div>
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">
-                    {col.group}
-                  </span>
-                  <p className="text-sm font-semibold leading-tight">{col.label}</p>
-                </div>
-                <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-background border text-xs font-semibold px-1.5">
-                  {count}
-                </span>
-              </div>
+          <div
+            key={phase.label}
+            className={`flex-shrink-0 w-[300px] flex flex-col rounded-xl border bg-muted/30 border-t-2 ${phase.accent}`}
+          >
+            {/* Column header */}
+            <div className="px-3 py-2.5 flex items-center justify-between border-b border-border/50">
+              <p className="text-sm font-semibold">{phase.label}</p>
+              <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-background border text-xs font-semibold px-1.5">
+                {count}
+              </span>
+            </div>
 
-              {/* Cards */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {colLoads.length === 0 ? (
-                  <p className="py-6 text-center text-[11px] text-muted-foreground/60">
-                    No loads
-                  </p>
-                ) : (
-                  colLoads.map((load) => (
-                    <LoadCard key={load.id} load={load} carrierMap={carrierMap} />
-                  ))
-                )}
-              </div>
+            {/* Cards */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              {data.loads.length === 0 ? (
+                <p className="py-6 text-center text-[11px] text-muted-foreground/60">No loads</p>
+              ) : (
+                data.loads.map((load) => (
+                  <LoadCard key={load.id} load={load} carrierMap={carrierMap} onQuickView={setQuickViewId} />
+                ))
+              )}
+
+              {/* Load more */}
+              {data.hasMore && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onLoadMore(phase.label, data.loads.length)}
+                  disabled={data.loadingMore}
+                  className="w-full gap-1.5 text-muted-foreground text-xs"
+                >
+                  {data.loadingMore ? (
+                    <Spinner size={12} />
+                  ) : (
+                    <ChevronDown size={13} />
+                  )}
+                  {data.loadingMore ? "Loading…" : `Load more (${count - data.loads.length} remaining)`}
+                </Button>
+              )}
             </div>
           </div>
         );
@@ -130,7 +147,7 @@ export function LoadKanban({ loads, stats, carrierMap, isLoading }: LoadKanbanPr
 
       {/* Cancelled column — collapsible */}
       <div
-        className={`flex-shrink-0 flex flex-col rounded-xl border bg-muted/30 border-t-2 ${GROUP_ACCENT["Cancelled"]} transition-all duration-300 ${cancelledOpen ? "w-[270px]" : "w-[52px]"}`}
+        className={`flex-shrink-0 flex flex-col rounded-xl border bg-muted/30 border-t-2 border-t-destructive transition-all duration-300 ${cancelledOpen ? "w-[300px]" : "w-[52px]"}`}
       >
         <button
           type="button"
@@ -139,19 +156,14 @@ export function LoadKanban({ loads, stats, carrierMap, isLoading }: LoadKanbanPr
         >
           {cancelledOpen ? (
             <>
-              <div>
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Done</span>
-                <p className="text-sm font-semibold leading-tight">Cancelled</p>
-              </div>
+              <p className="text-sm font-semibold">Cancelled</p>
               <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-background border text-xs font-semibold px-1.5">
                 {cancelledCount}
               </span>
             </>
           ) : (
             <div className="flex flex-col items-center w-full gap-1">
-              <span className="text-[10px] font-semibold text-destructive/70">
-                {cancelledCount}
-              </span>
+              <span className="text-[10px] font-semibold text-destructive/70">{cancelledCount}</span>
               <span
                 style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
                 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest"
@@ -168,12 +180,28 @@ export function LoadKanban({ loads, stats, carrierMap, isLoading }: LoadKanbanPr
               <p className="py-6 text-center text-[11px] text-muted-foreground/60">No loads</p>
             ) : (
               cancelledLoads.map((load) => (
-                <LoadCard key={load.id} load={load} carrierMap={carrierMap} />
+                <LoadCard key={load.id} load={load} carrierMap={carrierMap} onQuickView={setQuickViewId} />
               ))
+            )}
+            {cancelledHasMore && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onLoadMoreCancelled(cancelledLoads.length)}
+                disabled={cancelledLoadingMore}
+                className="w-full gap-1.5 text-muted-foreground text-xs"
+              >
+                {cancelledLoadingMore ? <Spinner size={12} /> : <ChevronDown size={13} />}
+                {cancelledLoadingMore
+                  ? "Loading…"
+                  : `Load more (${cancelledCount - cancelledLoads.length} remaining)`}
+              </Button>
             )}
           </div>
         )}
       </div>
+
+      <LoadDetailModal loadId={quickViewId} onClose={() => setQuickViewId(null)} />
     </div>
   );
 }

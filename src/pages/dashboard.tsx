@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable } from "@/components/ui/data-table";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
-import { LoadKanban } from "@/components/loads/load-kanban";
+import { LoadKanban, PHASE_COLUMNS } from "@/components/loads/load-kanban";
+import type { PhaseLoads } from "@/components/loads/load-kanban";
+import { LoadFilters } from "@/components/loads/load-filters";
 import { CreateLoadModal } from "@/components/loads/create-load-modal";
 import {
   Package,
@@ -19,6 +20,8 @@ import {
   RefreshCw,
   LayoutGrid,
   List,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Carrier, Load, LoadStats, PaginatedResponse } from "@/types";
@@ -27,99 +30,284 @@ import { utcToLocalDateDisplay } from "@/lib/date-utils";
 type ViewMode = "kanban" | "list";
 
 const LS_VIEW_MODE_KEY = "dashboard_view_mode";
+const LIST_LIMIT = 25;
+const KANBAN_LIMIT = 20;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function extractLoads(data: PaginatedResponse<Load> | Load[]): Load[] {
+  return Array.isArray(data) ? data : (data?.result ?? []);
+}
+
+function extractCount(data: PaginatedResponse<Load> | Load[], fallback: number): number {
+  return Array.isArray(data) ? fallback : (data?.count ?? fallback);
+}
+
+function serializeParams(params: Record<string, string | number | string[]>): string {
+  const parts: string[] = [];
+  for (const [key, val] of Object.entries(params)) {
+    if (Array.isArray(val)) {
+      val.forEach((v) => parts.push(`${key}=${encodeURIComponent(v)}`));
+    } else {
+      parts.push(`${key}=${encodeURIComponent(String(val))}`);
+    }
+  }
+  return parts.join("&");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { selectedCompanyId, companies } = useCompanyStore();
 
-  const [loads, setLoads] = useState<Load[]>([]);
+  // ── Common state ──
   const [stats, setStats] = useState<LoadStats | null>(null);
+  const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [carrierMap, setCarrierMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // ── View mode ──
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(LS_VIEW_MODE_KEY);
     return saved === "list" ? "list" : "kanban";
   });
 
-  // Persist view mode preference
-  const handleSetViewMode = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem(LS_VIEW_MODE_KEY, mode);
-  };
+  // ── Filter state ──
+  const [q, setQ] = useState("");
+  const [carrierId, setCarrierId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const STATUS_TABS = [
-    { value: "all",          label: t("dashboard_tab_all") },
-    { value: "created",      label: t("dashboard_tab_created") },
-    { value: "assigned",     label: t("dashboard_tab_assigned") },
-    { value: "accepted",     label: "Accepted" },
-    { value: "picking_up",   label: t("status_picking_up") },
-    { value: "picked_up",    label: t("status_picked_up") },
-    { value: "in_transit",   label: t("dashboard_tab_in_transit") },
-    { value: "dropping_off", label: t("status_dropping_off") },
-    { value: "dropped_off",  label: t("status_dropped_off") },
-    { value: "confirmed",    label: t("dashboard_tab_confirmed") },
-    { value: "cancelled",    label: t("dashboard_tab_cancelled") },
-  ] as const;
+  // ── List state ──
+  const [listLoads, setListLoads] = useState<Load[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
 
-  const fetchData = useCallback(async () => {
+  // ── Kanban state ──
+  const [kanbanPhaseData, setKanbanPhaseData] = useState<Record<string, PhaseLoads>>({});
+  const [cancelledState, setCancelledState] = useState<PhaseLoads>({
+    loads: [],
+    hasMore: false,
+    loadingMore: false,
+  });
+
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // ── Fetch carriers once per company ──
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    api
+      .get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`)
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : (res.data?.result ?? []);
+        setCarriers(list);
+        const map: Record<string, string> = {};
+        for (const c of list) map[c.carrier_id] = c.alias || `${c.first_name} ${c.last_name}`.trim();
+        setCarrierMap(map);
+      })
+      .catch(() => {});
+  }, [selectedCompanyId]);
+
+  // ── Fetch kanban (parallel per phase) ──
+  const fetchKanban = useCallback(async () => {
     if (!selectedCompanyId) return;
     setIsLoading(true);
     setError("");
     try {
-      // In kanban mode: always fetch all loads so all columns are populated
-      // In list mode: filter by active tab
-      const loadsParams: Record<string, string | number | string[]> = { limit: 200, offset: 0 };
-      if (viewMode === "list" && activeTab !== "all") loadsParams.status = [activeTab];
+      const extra: Record<string, string> = {};
+      if (q) extra.q = q;
+      if (carrierId) extra.carrier_id = carrierId;
 
-      const [loadsRes, statsRes, carriersRes] = await Promise.all([
-        api.get<PaginatedResponse<Load> | Load[]>(
-          `/companies/${selectedCompanyId}/loads`,
-          {
-            params: loadsParams,
-            paramsSerializer: (params) => {
-              const parts: string[] = [];
-              for (const [key, val] of Object.entries(params)) {
-                if (Array.isArray(val)) {
-                  val.forEach((v) => parts.push(`${key}=${encodeURIComponent(v)}`));
-                } else {
-                  parts.push(`${key}=${encodeURIComponent(val)}`);
-                }
-              }
-              return parts.join("&");
-            },
-          }
-        ),
+      const [statsRes, ...allPhaseRes] = await Promise.all([
         api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`),
-        api.get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`),
+        ...PHASE_COLUMNS.map((phase) =>
+          api.get<PaginatedResponse<Load> | Load[]>(`/companies/${selectedCompanyId}/loads`, {
+            params: { ...extra, status: phase.statuses, limit: KANBAN_LIMIT, offset: 0 },
+            paramsSerializer: serializeParams,
+          })
+        ),
+        api.get<PaginatedResponse<Load> | Load[]>(`/companies/${selectedCompanyId}/loads`, {
+          params: { ...extra, status: ["cancelled"], limit: KANBAN_LIMIT, offset: 0 },
+          paramsSerializer: serializeParams,
+        }),
       ]);
 
-      setLoads(Array.isArray(loadsRes.data) ? loadsRes.data : (loadsRes.data?.result ?? []));
       setStats(statsRes.data);
 
-      const carrierList = Array.isArray(carriersRes.data)
-        ? carriersRes.data
-        : (carriersRes.data?.result ?? []);
-      const map: Record<string, string> = {};
-      for (const c of carrierList) {
-        map[c.carrier_id] = c.alias || `${c.first_name} ${c.last_name}`.trim();
-      }
-      setCarrierMap(map);
+      const newPhaseData: Record<string, PhaseLoads> = {};
+      PHASE_COLUMNS.forEach((phase, i) => {
+        const data = allPhaseRes[i].data;
+        const loads = extractLoads(data);
+        const total = extractCount(data, loads.length);
+        newPhaseData[phase.label] = { loads, hasMore: loads.length < total, loadingMore: false };
+      });
+      setKanbanPhaseData(newPhaseData);
+
+      const cancelledData = allPhaseRes[PHASE_COLUMNS.length].data;
+      const cancelledLoads = extractLoads(cancelledData);
+      const cancelledTotal = extractCount(cancelledData, cancelledLoads.length);
+      setCancelledState({ loads: cancelledLoads, hasMore: cancelledLoads.length < cancelledTotal, loadingMore: false });
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCompanyId, activeTab, viewMode]);
+  }, [selectedCompanyId, q, carrierId]);
+
+  // ── Fetch list (paginated) ──
+  const fetchList = useCallback(async () => {
+    if (!selectedCompanyId) return;
+    setIsLoading(true);
+    setError("");
+    try {
+      const params: Record<string, string | number | string[]> = {
+        limit: LIST_LIMIT,
+        offset: page * LIST_LIMIT,
+      };
+      if (statusFilter !== "all") params.status = [statusFilter];
+      if (q) params.q = q;
+      if (carrierId) params.carrier_id = carrierId;
+
+      const [loadsRes, statsRes] = await Promise.all([
+        api.get<PaginatedResponse<Load> | Load[]>(`/companies/${selectedCompanyId}/loads`, {
+          params,
+          paramsSerializer: serializeParams,
+        }),
+        api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`),
+      ]);
+
+      const loads = extractLoads(loadsRes.data);
+      setListLoads(loads);
+      setTotalCount(extractCount(loadsRes.data, loads.length));
+      setStats(statsRes.data);
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedCompanyId, statusFilter, page, q, carrierId]);
+
+  // ── Unified refresh (used by button + interval) ──
+  const fetchData = useCallback(() => {
+    if (viewMode === "kanban") return fetchKanban();
+    return fetchList();
+  }, [viewMode, fetchKanban, fetchList]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 60_000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  // ── Kanban: load more per phase ──
+  const handleLoadMore = useCallback(
+    async (phaseLabel: string, currentOffset: number) => {
+      if (!selectedCompanyId) return;
+      const phase = PHASE_COLUMNS.find((p) => p.label === phaseLabel);
+      if (!phase) return;
+
+      setKanbanPhaseData((prev) => ({
+        ...prev,
+        [phaseLabel]: { ...prev[phaseLabel], loadingMore: true },
+      }));
+
+      try {
+        const params: Record<string, string | number | string[]> = {
+          status: phase.statuses,
+          limit: KANBAN_LIMIT,
+          offset: currentOffset,
+        };
+        if (q) params.q = q;
+        if (carrierId) params.carrier_id = carrierId;
+
+        const res = await api.get<PaginatedResponse<Load> | Load[]>(
+          `/companies/${selectedCompanyId}/loads`,
+          { params, paramsSerializer: serializeParams }
+        );
+        const newLoads = extractLoads(res.data);
+        const total = extractCount(res.data, currentOffset + newLoads.length);
+
+        setKanbanPhaseData((prev) => ({
+          ...prev,
+          [phaseLabel]: {
+            loads: [...(prev[phaseLabel]?.loads ?? []), ...newLoads],
+            hasMore: currentOffset + newLoads.length < total,
+            loadingMore: false,
+          },
+        }));
+      } catch {
+        setKanbanPhaseData((prev) => ({
+          ...prev,
+          [phaseLabel]: { ...prev[phaseLabel], loadingMore: false },
+        }));
+      }
+    },
+    [selectedCompanyId, q, carrierId]
+  );
+
+  // ── Kanban: load more cancelled ──
+  const handleLoadMoreCancelled = useCallback(
+    async (currentOffset: number) => {
+      if (!selectedCompanyId) return;
+
+      setCancelledState((prev) => ({ ...prev, loadingMore: true }));
+
+      try {
+        const params: Record<string, string | number | string[]> = {
+          status: ["cancelled"],
+          limit: KANBAN_LIMIT,
+          offset: currentOffset,
+        };
+        if (q) params.q = q;
+        if (carrierId) params.carrier_id = carrierId;
+
+        const res = await api.get<PaginatedResponse<Load> | Load[]>(
+          `/companies/${selectedCompanyId}/loads`,
+          { params, paramsSerializer: serializeParams }
+        );
+        const newLoads = extractLoads(res.data);
+        const total = extractCount(res.data, currentOffset + newLoads.length);
+
+        setCancelledState((prev) => ({
+          loads: [...prev.loads, ...newLoads],
+          hasMore: currentOffset + newLoads.length < total,
+          loadingMore: false,
+        }));
+      } catch {
+        setCancelledState((prev) => ({ ...prev, loadingMore: false }));
+      }
+    },
+    [selectedCompanyId, q, carrierId]
+  );
+
+  // ── Filter handlers (always reset page/kanban on filter change) ──
+  const handleQChange = (val: string) => {
+    setQ(val);
+    setPage(0);
+    setKanbanPhaseData({});
+  };
+  const handleCarrierIdChange = (val: string) => {
+    setCarrierId(val);
+    setPage(0);
+    setKanbanPhaseData({});
+  };
+  const handleStatusFilterChange = (val: string) => {
+    setStatusFilter(val);
+    setPage(0);
+  };
+
+  const handleSetViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setPage(0);
+    localStorage.setItem(LS_VIEW_MODE_KEY, mode);
+  };
+
+  // ── Pagination helpers ──
+  const totalPages = Math.max(1, Math.ceil(totalCount / LIST_LIMIT));
+  const pageStart = page * LIST_LIMIT + 1;
+  const pageEnd = Math.min((page + 1) * LIST_LIMIT, totalCount);
 
   // ── Table columns ──
   const columns: ColumnDef<Load>[] = [
@@ -180,7 +368,10 @@ export default function DashboardPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={(e) => { e.stopPropagation(); navigate(`/loads/${row.original.id}`); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/loads/${row.original.id}`);
+          }}
           className="gap-1"
         >
           <Eye size={14} />
@@ -270,6 +461,18 @@ export default function DashboardPage() {
           </Button>
         </div>
 
+        {/* ── Filters ── */}
+        <LoadFilters
+          q={q}
+          onQChange={handleQChange}
+          carrierId={carrierId}
+          onCarrierIdChange={handleCarrierIdChange}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
+          carriers={carriers}
+          showStatusFilter={viewMode === "list"}
+        />
+
         {/* ── Error banner ── */}
         {error && (
           <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
@@ -278,55 +481,81 @@ export default function DashboardPage() {
         {/* ── Kanban view ── */}
         {viewMode === "kanban" && (
           <LoadKanban
-            loads={loads}
+            phaseData={kanbanPhaseData}
+            cancelledLoads={cancelledState.loads}
+            cancelledHasMore={cancelledState.hasMore}
+            cancelledLoadingMore={cancelledState.loadingMore}
             stats={stats}
             carrierMap={carrierMap}
             isLoading={isLoading}
+            onLoadMore={handleLoadMore}
+            onLoadMoreCancelled={handleLoadMoreCancelled}
           />
         )}
 
         {/* ── List view ── */}
         {viewMode === "list" && (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="flex-wrap h-auto gap-1">
-              {STATUS_TABS.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <div className="space-y-3">
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <Spinner size={24} />
+              </div>
+            ) : listLoads.length === 0 ? (
+              <EmptyState
+                icon={<Package size={32} />}
+                title={t("dashboard_no_loads")}
+                description={
+                  q || carrierId || statusFilter !== "all"
+                    ? "No loads match your filters."
+                    : t("dashboard_no_loads_desc_all")
+                }
+                action={
+                  !q && !carrierId && statusFilter === "all"
+                    ? {
+                        label: t("dashboard_create_load"),
+                        onClick: () => setCreateModalOpen(true),
+                      }
+                    : undefined
+                }
+              />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={listLoads}
+                onRowClick={(load) => navigate(`/loads/${load.id}`)}
+              />
+            )}
 
-            {STATUS_TABS.map((tab) => (
-              <TabsContent key={tab.value} value={tab.value} className="mt-4">
-                {isLoading ? (
-                  <div className="flex justify-center py-12">
-                    <Spinner size={24} />
-                  </div>
-                ) : loads.length === 0 ? (
-                  <EmptyState
-                    icon={<Package size={32} />}
-                    title={t("dashboard_no_loads")}
-                    description={
-                      activeTab === "all"
-                        ? t("dashboard_no_loads_desc_all")
-                        : t("dashboard_no_loads_desc_status", { status: tab.label })
-                    }
-                    action={
-                      activeTab === "all"
-                        ? { label: t("dashboard_create_load"), onClick: () => setCreateModalOpen(true) }
-                        : undefined
-                    }
-                  />
-                ) : (
-                  <DataTable
-                    columns={columns}
-                    data={loads}
-                    onRowClick={(load) => navigate(`/loads/${load.id}`)}
-                  />
-                )}
-              </TabsContent>
-            ))}
-          </Tabs>
+            {/* ── Pagination controls ── */}
+            {!isLoading && totalCount > LIST_LIMIT && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground pt-1">
+                <span>{`Showing ${pageStart}–${pageEnd} of ${totalCount}`}</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => p - 1)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronLeft size={14} />
+                  </Button>
+                  <span className="px-2 tabular-nums">
+                    {page + 1} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronRight size={14} />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

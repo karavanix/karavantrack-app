@@ -8,9 +8,10 @@ import { utcToLocalDateDisplay } from "@/lib/date-utils";
 interface LoadCardProps {
   load: Load;
   carrierMap: Record<string, string>;
+  onQuickView?: (loadId: string) => void;
 }
 
-export function LoadCard({ load, carrierMap }: LoadCardProps) {
+export function LoadCard({ load, carrierMap, onQuickView }: LoadCardProps) {
   const navigate = useNavigate();
 
   const carrierName = load.carrier_id ? (carrierMap[load.carrier_id] ?? null) : null;
@@ -21,7 +22,7 @@ export function LoadCard({ load, carrierMap }: LoadCardProps) {
   return (
     <Card
       className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all duration-200 active:scale-[0.99]"
-      onClick={() => navigate(`/loads/${load.id}`)}
+      onClick={() => onQuickView ? onQuickView(load.id) : navigate(`/loads/${load.id}`)}
     >
       <CardContent className="p-3 space-y-2">
         {/* Title + Reference */}

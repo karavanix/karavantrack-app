@@ -240,7 +240,7 @@ export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-3 shrink-0 border-b">
           <DialogTitle>{t("create_load_title")}</DialogTitle>
           <DialogDescription>{t("create_load_subtitle")}</DialogDescription>
