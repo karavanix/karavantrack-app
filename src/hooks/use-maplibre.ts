@@ -75,7 +75,6 @@ export function useMapLibre(opts: UseMapLibreOptions = {}) {
       renderWorldCopies: false, // Only one world copy — saves GPU on logistics maps
       maxPitch: 0,              // Keep map flat; these are 2D tracking maps
       pitchWithRotate: false,   // Prevent accidental pitch from pinch-rotate
-      antialias: false,         // Disable MSAA — negligible visual diff, better perf
     });
 
     map.addControl(new maplibregl.NavigationControl(), "top-right");
