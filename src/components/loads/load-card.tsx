@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
-import { MapPin, Navigation, Calendar } from "lucide-react";
+import { MapPin, Navigation, Calendar, User } from "lucide-react";
 import type { Load } from "@/types";
 import { utcToLocalDateDisplay } from "@/lib/date-utils";
+import { truncate } from "@/lib/string-utils";
 
 interface LoadCardProps {
   load: Load;
@@ -15,9 +16,6 @@ export function LoadCard({ load, carrierMap, onQuickView }: LoadCardProps) {
   const navigate = useNavigate();
 
   const carrierName = load.carrier_id ? (carrierMap[load.carrier_id] ?? null) : null;
-
-  const truncate = (str: string, max = 36) =>
-    str.length > max ? str.slice(0, max) + "…" : str;
 
   return (
     <Card
@@ -38,7 +36,10 @@ export function LoadCard({ load, carrierMap, onQuickView }: LoadCardProps) {
 
         {/* Carrier */}
         {carrierName && (
-          <p className="text-xs text-muted-foreground truncate">👤 {carrierName}</p>
+          <div className="flex items-center gap-1">
+            <User size={11} className="text-muted-foreground shrink-0" aria-hidden />
+            <p className="text-xs text-muted-foreground truncate">{carrierName}</p>
+          </div>
         )}
 
         {/* Route */}

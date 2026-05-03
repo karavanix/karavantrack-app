@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
@@ -96,10 +96,14 @@ export default function DashboardPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // ── Fetch carriers once per company ──
+  // Pass limit=500 to avoid default pagination truncating the list.
+  // carrier_id on the Carrier object is the user's UUID — same value stored on Load.carrier_id.
   useEffect(() => {
     if (!selectedCompanyId) return;
     api
-      .get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`)
+      .get<PaginatedResponse<Carrier> | Carrier[]>(`/companies/${selectedCompanyId}/carriers`, {
+        params: { limit: 500 },
+      })
       .then((res) => {
         const list = Array.isArray(res.data) ? res.data : (res.data?.result ?? []);
         setCarriers(list);
@@ -110,9 +114,19 @@ export default function DashboardPage() {
       .catch(() => {});
   }, [selectedCompanyId]);
 
+  // ── Abort controller ref — cancels stale requests on rapid filter changes ──
+  const kanbanAbortRef = useRef<AbortController | null>(null);
+  const listAbortRef = useRef<AbortController | null>(null);
+
   // ── Fetch kanban (parallel per phase) ──
   const fetchKanban = useCallback(async () => {
     if (!selectedCompanyId) return;
+
+    // Cancel any in-flight kanban request
+    kanbanAbortRef.current?.abort();
+    const controller = new AbortController();
+    kanbanAbortRef.current = controller;
+
     setIsLoading(true);
     setError("");
     try {
@@ -120,17 +134,21 @@ export default function DashboardPage() {
       if (q) extra.q = q;
       if (carrierId) extra.carrier_id = carrierId;
 
+      const signal = controller.signal;
+
       const [statsRes, ...allPhaseRes] = await Promise.all([
-        api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`),
+        api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`, { signal }),
         ...PHASE_COLUMNS.map((phase) =>
           api.get<PaginatedResponse<Load> | Load[]>(`/companies/${selectedCompanyId}/loads`, {
             params: { ...extra, status: phase.statuses, limit: KANBAN_LIMIT, offset: 0 },
             paramsSerializer: serializeParams,
+            signal,
           })
         ),
         api.get<PaginatedResponse<Load> | Load[]>(`/companies/${selectedCompanyId}/loads`, {
           params: { ...extra, status: ["cancelled"], limit: KANBAN_LIMIT, offset: 0 },
           paramsSerializer: serializeParams,
+          signal,
         }),
       ]);
 
@@ -149,7 +167,9 @@ export default function DashboardPage() {
       const cancelledLoads = extractLoads(cancelledData);
       const cancelledTotal = extractCount(cancelledData, cancelledLoads.length);
       setCancelledState({ loads: cancelledLoads, hasMore: cancelledLoads.length < cancelledTotal, loadingMore: false });
-    } catch (err) {
+    } catch (err: unknown) {
+      // Ignore abort errors — they are intentional when filters change
+      if (err instanceof Error && err.name === "CanceledError") return;
       setError(getApiErrorMessage(err));
     } finally {
       setIsLoading(false);
@@ -159,6 +179,12 @@ export default function DashboardPage() {
   // ── Fetch list (paginated) ──
   const fetchList = useCallback(async () => {
     if (!selectedCompanyId) return;
+
+    // Cancel any in-flight list request
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    listAbortRef.current = controller;
+
     setIsLoading(true);
     setError("");
     try {
@@ -170,19 +196,24 @@ export default function DashboardPage() {
       if (q) params.q = q;
       if (carrierId) params.carrier_id = carrierId;
 
+      const signal = controller.signal;
+
       const [loadsRes, statsRes] = await Promise.all([
         api.get<PaginatedResponse<Load> | Load[]>(`/companies/${selectedCompanyId}/loads`, {
           params,
           paramsSerializer: serializeParams,
+          signal,
         }),
-        api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`),
+        api.get<LoadStats>(`/companies/${selectedCompanyId}/loads/stats`, { signal }),
       ]);
 
       const loads = extractLoads(loadsRes.data);
       setListLoads(loads);
       setTotalCount(extractCount(loadsRes.data, loads.length));
       setStats(statsRes.data);
-    } catch (err) {
+    } catch (err: unknown) {
+      // Ignore abort errors — they are intentional when filters change
+      if (err instanceof Error && err.name === "CanceledError") return;
       setError(getApiErrorMessage(err));
     } finally {
       setIsLoading(false);
@@ -195,11 +226,20 @@ export default function DashboardPage() {
     return fetchList();
   }, [viewMode, fetchKanban, fetchList]);
 
+  // Effect 1: Trigger a fetch whenever filters, view mode, or page change
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60_000);
-    return () => clearInterval(interval);
   }, [fetchData]);
+
+  // Effect 2: Periodic auto-refresh — independent of filter changes so typing
+  // doesn't reset the 60-second timer. Uses a stable ref to always call the
+  // latest version of fetchData without re-subscribing the interval.
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+  useEffect(() => {
+    const interval = setInterval(() => fetchDataRef.current(), 60_000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Kanban: load more per phase ──
   const handleLoadMore = useCallback(
@@ -282,16 +322,17 @@ export default function DashboardPage() {
     [selectedCompanyId, q, carrierId]
   );
 
-  // ── Filter handlers (always reset page/kanban on filter change) ──
+  // ── Filter handlers ──
+  // Note: we deliberately do NOT clear kanbanPhaseData here so the board
+  // keeps showing stale data while the new fetch is in-flight (no flicker).
+  // The AbortController in fetchKanban will cancel the previous request.
   const handleQChange = (val: string) => {
     setQ(val);
     setPage(0);
-    setKanbanPhaseData({});
   };
   const handleCarrierIdChange = (val: string) => {
     setCarrierId(val);
     setPage(0);
-    setKanbanPhaseData({});
   };
   const handleStatusFilterChange = (val: string) => {
     setStatusFilter(val);
@@ -405,7 +446,12 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="space-y-5">
+      {/*
+       * Kanban mode: h-full flex-col so the board fills the remaining viewport
+       * height and each column can scroll independently.
+       * List mode: plain space-y-5 block layout (content-height driven).
+       */}
+      <div className={viewMode === "kanban" ? "h-full flex flex-col gap-5" : "space-y-5"}>
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -480,17 +526,22 @@ export default function DashboardPage() {
 
         {/* ── Kanban view ── */}
         {viewMode === "kanban" && (
-          <LoadKanban
-            phaseData={kanbanPhaseData}
-            cancelledLoads={cancelledState.loads}
-            cancelledHasMore={cancelledState.hasMore}
-            cancelledLoadingMore={cancelledState.loadingMore}
-            stats={stats}
-            carrierMap={carrierMap}
-            isLoading={isLoading}
-            onLoadMore={handleLoadMore}
-            onLoadMoreCancelled={handleLoadMoreCancelled}
-          />
+          // flex-1 min-h-0: grow to fill remaining flex space; min-h-0 allows
+          // the child to shrink below its content height so columns scroll
+          // independently rather than pushing the page taller.
+          <div className="flex-1 min-h-0">
+            <LoadKanban
+              phaseData={kanbanPhaseData}
+              cancelledLoads={cancelledState.loads}
+              cancelledHasMore={cancelledState.hasMore}
+              cancelledLoadingMore={cancelledState.loadingMore}
+              stats={stats}
+              carrierMap={carrierMap}
+              isLoading={isLoading}
+              onLoadMore={handleLoadMore}
+              onLoadMoreCancelled={handleLoadMoreCancelled}
+            />
+          </div>
         )}
 
         {/* ── List view ── */}

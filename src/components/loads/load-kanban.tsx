@@ -65,6 +65,15 @@ function phaseCount(phase: (typeof PHASE_COLUMNS)[number], stats: LoadStats | nu
   }, 0);
 }
 
+/**
+ * Returns the cancelled count from stats.
+ * Centralized here because the API spells it "canceled" (one L) while
+ * our UI uses "cancelled" (two L's). A single place to fix if the API changes.
+ */
+function getCancelledCount(stats: LoadStats | null, fallback: number): number {
+  return stats?.canceled ?? fallback;
+}
+
 export function LoadKanban({
   phaseData,
   cancelledLoads,
@@ -79,7 +88,7 @@ export function LoadKanban({
   const [cancelledOpen, setCancelledOpen] = useState(false);
   const [quickViewId, setQuickViewId] = useState<string | null>(null);
 
-  const cancelledCount = stats?.canceled ?? cancelledLoads.length;
+  const cancelledCount = getCancelledCount(stats, cancelledLoads.length);
 
   if (isLoading && Object.keys(phaseData).length === 0) {
     return (
@@ -90,7 +99,7 @@ export function LoadKanban({
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4 min-h-[60vh]">
+    <div className="flex gap-3 overflow-x-auto pb-4 h-full">
       {PHASE_COLUMNS.map((phase) => {
         const data = phaseData[phase.label] ?? { loads: [], hasMore: false, loadingMore: false };
         const count = phaseCount(phase, stats, data.loads.length);
@@ -98,7 +107,7 @@ export function LoadKanban({
         return (
           <div
             key={phase.label}
-            className={`flex-shrink-0 w-[300px] flex flex-col rounded-xl border bg-muted/30 border-t-2 ${phase.accent}`}
+            className={`flex-shrink-0 w-[300px] flex flex-col rounded-xl border bg-muted/30 border-t-2 ${phase.accent} overflow-hidden`}
           >
             {/* Column header */}
             <div className="px-3 py-2.5 flex items-center justify-between border-b border-border/50">
@@ -109,7 +118,7 @@ export function LoadKanban({
             </div>
 
             {/* Cards */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
               {data.loads.length === 0 ? (
                 <p className="py-6 text-center text-[11px] text-muted-foreground/60">No loads</p>
               ) : (
@@ -147,7 +156,7 @@ export function LoadKanban({
 
       {/* Cancelled column — collapsible */}
       <div
-        className={`flex-shrink-0 flex flex-col rounded-xl border bg-muted/30 border-t-2 border-t-destructive transition-all duration-300 ${cancelledOpen ? "w-[300px]" : "w-[52px]"}`}
+        className={`flex-shrink-0 flex flex-col rounded-xl border bg-muted/30 border-t-2 border-t-destructive transition-all duration-300 overflow-hidden ${cancelledOpen ? "w-[300px]" : "w-[52px]"}`}
       >
         <button
           type="button"
@@ -175,7 +184,7 @@ export function LoadKanban({
         </button>
 
         {cancelledOpen && (
-          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
             {cancelledLoads.length === 0 ? (
               <p className="py-6 text-center text-[11px] text-muted-foreground/60">No loads</p>
             ) : (

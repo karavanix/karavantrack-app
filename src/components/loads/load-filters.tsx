@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Carrier } from "@/types";
 
 const STATUS_OPTIONS = [
@@ -76,31 +83,35 @@ export function LoadFilters({
 
       {/* Status filter */}
       {showStatusFilter && (
-        <select
-          value={statusFilter}
-          onChange={(e) => onStatusFilterChange(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+          <SelectTrigger className="h-9 w-[160px] text-sm">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
 
       {/* Carrier filter */}
       {carriers.length > 0 && (
-        <select
-          value={carrierId}
-          onChange={(e) => onCarrierIdChange(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">All carriers</option>
-          {carriers.map((c) => (
-            <option key={c.carrier_id} value={c.carrier_id}>
-              {c.alias || `${c.first_name} ${c.last_name}`.trim()}
-            </option>
-          ))}
-        </select>
+        <Select value={carrierId || "__all__"} onValueChange={(v) => onCarrierIdChange(v === "__all__" ? "" : v)}>
+          <SelectTrigger className="h-9 w-[160px] text-sm">
+            <SelectValue placeholder="All carriers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All carriers</SelectItem>
+            {carriers.map((c) => (
+              <SelectItem key={c.carrier_id} value={c.carrier_id}>
+                {c.alias || `${c.first_name} ${c.last_name}`.trim()}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
 
       {/* Clear filters */}

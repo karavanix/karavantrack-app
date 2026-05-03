@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import maplibregl, { LngLatBounds } from "maplibre-gl";
 import { useMapLibre, type LatLng } from "@/hooks/use-maplibre";
 import { createMapMarker, updateMarkerHeading } from "@/components/map/map-markers";
@@ -74,16 +74,29 @@ export default function MapLibreTrackingMap({
   /** True while a programmatic camera move is in progress */
   const isProgrammaticMoveRef = useRef(false);
 
-  // Stable ref — only uses the *initial* prop values for map center
-  const fallbackCenterRef = useRef<[number, number]>(
-    pickup
-      ? [pickup.lng, pickup.lat]
-      : dropoff
-      ? [dropoff.lng, dropoff.lat]
-      : carrierPosition
-      ? [carrierPosition.lng, carrierPosition.lat]
-      : [69.2401, 41.2995]
-  );
+  /**
+   * Pre-compute the initial map center from ALL available points so the map
+   * starts as close to the final view as possible — minimising the camera
+   * distance the subsequent instant fitBounds has to cover.
+   * useMemo with [] deps captures only the initial render's props (stable).
+   */
+  const initialCenter = useMemo<[number, number]>(() => {
+    const pts: [number, number][] = [];
+    if (pickup)          pts.push([pickup.lng, pickup.lat]);
+    if (dropoff)         pts.push([dropoff.lng, dropoff.lat]);
+    if (carrierPosition) pts.push([carrierPosition.lng, carrierPosition.lat]);
+    if (pts.length === 0) return [69.2401, 41.2995];
+    const lngs = pts.map((p) => p[0]);
+    const lats  = pts.map((p) => p[1]);
+    return [
+      (Math.min(...lngs) + Math.max(...lngs)) / 2,
+      (Math.min(...lats) + Math.max(...lats)) / 2,
+    ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep a stable ref so the map init hook doesn't change on re-renders
+  const fallbackCenterRef = useRef<[number, number]>(initialCenter);
 
   const ensureSourcesAndLayers = useCallback((map: maplibregl.Map) => {
     if (!map.getSource(PLANNED_ROUTE_SOURCE_ID)) {
@@ -277,9 +290,10 @@ export default function MapLibreTrackingMap({
     hasInitiallyFittedRef.current = true;
 
     if (points.length === 1) {
+      // jumpTo is instant — no animation — user sees the final state immediately
       isProgrammaticMoveRef.current = true;
-      map.flyTo({ center: points[0], zoom: 13, essential: true });
-      map.once("moveend", () => { isProgrammaticMoveRef.current = false; });
+      map.jumpTo({ center: points[0], zoom: 13 });
+      isProgrammaticMoveRef.current = false;
       return;
     }
 
@@ -288,8 +302,9 @@ export default function MapLibreTrackingMap({
       bounds.extend(point);
     }
 
+    // duration: 0 = instant snap to final view, no zoom-in/zoom-out animation
     isProgrammaticMoveRef.current = true;
-    map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 800 });
+    map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
     map.once("moveend", () => { isProgrammaticMoveRef.current = false; });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);
@@ -304,21 +319,25 @@ export default function MapLibreTrackingMap({
     isProgrammaticMoveRef.current = true;
 
     if (!hasCenteredCarrierRef.current) {
-      map.flyTo({
+      // First time we see the carrier — jump instantly, no dramatic flyTo sweep.
+      // The initial fitBounds already positioned the camera near the route;
+      // jumpTo just re-centers on the carrier without re-zooming the whole map.
+      map.jumpTo({
         center: nextCenter,
         zoom: Math.max(map.getZoom(), 14),
-        essential: true,
       });
       hasCenteredCarrierRef.current = true;
+      isProgrammaticMoveRef.current = false;
     } else {
+      // Subsequent live position updates — short ease so movement feels smooth
+      // but not laggy. 400ms is fast enough to feel real-time.
       map.easeTo({
         center: nextCenter,
-        duration: 1200,
+        duration: 400,
         essential: true,
       });
+      map.once("moveend", () => { isProgrammaticMoveRef.current = false; });
     }
-
-    map.once("moveend", () => { isProgrammaticMoveRef.current = false; });
   }, [carrierPosition, following, isReady, mapRef]);
 
   // Cleanup markers on unmount
