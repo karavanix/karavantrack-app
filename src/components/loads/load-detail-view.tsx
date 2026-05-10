@@ -131,8 +131,21 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
       }
 
       try {
-        const trackRes = await api.get<TrackResponse>(`/loads/${loadId}/track`);
-        setTrackPoints(trackRes.data?.points ?? []);
+        const PAGE_SIZE = 1000;
+        let offset = 0;
+        let allPoints: TrackPoint[] = [];
+        let total = Infinity;
+        while (allPoints.length < total) {
+          const trackRes = await api.get<TrackResponse>(
+            `/loads/${loadId}/track?limit=${PAGE_SIZE}&offset=${offset}`
+          );
+          const { points = [], total: t } = trackRes.data ?? {};
+          total = t ?? 0;
+          allPoints = allPoints.concat(points);
+          offset += points.length;
+          if (points.length < PAGE_SIZE) break;
+        }
+        setTrackPoints(allPoints);
       } catch {
         setTrackPoints([]);
       }
