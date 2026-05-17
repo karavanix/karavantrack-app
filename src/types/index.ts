@@ -19,7 +19,13 @@ export interface AuthTokens {
   refresh_token: string;
 }
 
-export interface RegisterResponse extends AuthTokens {
+// ──── Email Verification ────
+export interface VerifyEmailRequest {
+  email: string;
+  code: string;
+}
+
+export interface VerifyEmailResponse extends AuthTokens {
   role: string;
 }
 
@@ -241,6 +247,8 @@ export interface CreateLoadResponse {
 
 export interface AssignLoadRequest {
   carrier_id: string;
+  note?: string;
+  attachment_ids?: string[];
 }
 
 // ──── Tracking ────

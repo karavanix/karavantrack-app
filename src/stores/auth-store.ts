@@ -6,7 +6,8 @@ import type {
   LoginRequest,
   RegisterRequest,
   AuthTokens,
-  RegisterResponse,
+  VerifyEmailRequest,
+  VerifyEmailResponse,
 } from "@/types";
 
 interface AuthState {
@@ -19,6 +20,7 @@ interface AuthState {
   setUser: (user: User) => void;
   login: (req: LoginRequest) => Promise<void>;
   register: (req: RegisterRequest) => Promise<void>;
+  verifyEmail: (req: VerifyEmailRequest) => Promise<void>;
   fetchMe: () => Promise<void>;
   logout: () => void;
   isAuthenticated: () => boolean;
@@ -55,7 +57,20 @@ export const useAuthStore = create<AuthState>()(
       register: async (req) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post<RegisterResponse>("/auth/register", req);
+          // Register now just sends the OTP email — no tokens returned
+          await api.post("/auth/register", req);
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      verifyEmail: async (req) => {
+        set({ isLoading: true });
+        try {
+          const { data } = await api.post<VerifyEmailResponse>(
+            "/auth/verify-email",
+            req
+          );
           set({
             accessToken: data.access_token,
             refreshToken: data.refresh_token,

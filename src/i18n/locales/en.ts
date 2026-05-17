@@ -60,6 +60,14 @@ const en = {
   register_and: "and",
   register_privacy_link: "Privacy Policy",
 
+  // Auth — Verify Email
+  verify_title: "Check your email",
+  verify_subtitle: "We sent a 6-digit code to {{email}}",
+  verify_digit: "Digit",
+  verify_verifying: "Verifying...",
+  verify_hint: "Didn't receive the code? Check your spam folder or go back to try again.",
+  verify_back: "Back to registration",
+
   // Dashboard
   dashboard_title: "Dashboard",
   dashboard_subtitle: "Overview of your shipments and activity",

@@ -60,6 +60,14 @@ const uz = {
   register_and: "va",
   register_privacy_link: "Maxfiylik siyosati",
 
+  // Auth — Verify Email
+  verify_title: "Emailingizni tekshiring",
+  verify_subtitle: "{{email}} manziliga 6 raqamli kod yubordik",
+  verify_digit: "Raqam",
+  verify_verifying: "Tekshirilmoqda...",
+  verify_hint: "Kodni olmadingizmi? Spam papkasini tekshiring yoki qaytadan urinib ko'ring.",
+  verify_back: "Ro'yxatga qaytish",
+
   // Dashboard
   dashboard_title: "Boshqaruv paneli",
   dashboard_subtitle: "Yuklar va faoliyat xulosasi",
