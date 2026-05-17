@@ -24,4 +24,4 @@ export function getFirebaseMessaging(): Messaging | null {
 }
 
 export const VAPID_KEY =
-  "BM4EeK7D06U9DDXrgcOkb80ZHInTPcVZSUiWILe9_pVzRgr5AWVabXa8tdIun3cRKb1_q3PDqXFybtVRXBN0Av4";
+  "BANlnlsukbjS8rRux_EEUWQULYk0Py9CJQ21K75J1fozBou4q4y50CRkb-8t4YlpPtH07l58DyV9-z7oA_gowyY";
