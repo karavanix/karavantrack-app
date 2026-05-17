@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationButton } from "@/components/ui/notification-button";
 import { Menu, ChevronDown, LogOut, User, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -87,6 +88,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Right: Language switcher + User menu */}
       <div className="flex items-center gap-1">
+        <NotificationButton />
         <LanguageSwitcher />
         <ThemeToggle />
 
