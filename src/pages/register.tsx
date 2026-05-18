@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle, ArrowLeft, CheckSquare, Mail, Square } from "lucide-react";
 import { TelegramLoginButton } from "@/components/telegram-login-button";
-import type { TelegramSignInRequest } from "@/types";
 
 type Step = "form" | "verify";
 
@@ -31,7 +30,7 @@ export default function RegisterPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // OTP state
-  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [otpDigits, setOtpDigits] = useState<string[]>(["" ,"", "", "", "", ""]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const update = (field: string, value: string) =>
@@ -72,10 +71,10 @@ export default function RegisterPage() {
     }
   };
 
-  const handleTelegramAuth = async (data: TelegramSignInRequest) => {
+  const handleTelegramAuth = async (idToken: string) => {
     setError("");
     try {
-      await telegramSignIn(data);
+      await telegramSignIn({ id_token: idToken, role: "shipper" });
       navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err));
@@ -308,9 +307,10 @@ export default function RegisterPage() {
                 </Button>
 
                 <TelegramLoginButton
-                  botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
-                  origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
+                  clientId={import.meta.env.VITE_TELEGRAM_CLIENT_ID ?? ""}
+                  redirectUri={`${window.location.origin}/auth/telegram/callback`}
                   onAuth={handleTelegramAuth}
+                  onError={(e) => setError(e.message)}
                   disabled={isLoading}
                 >
                   {t("auth_sign_up_telegram")}
