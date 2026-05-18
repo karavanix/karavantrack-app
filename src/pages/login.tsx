@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle } from "lucide-react";
 import { TelegramLoginButton } from "@/components/telegram-login-button";
-import type { TelegramSignInRequest } from "@/types";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -20,10 +19,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleTelegramAuth = async (data: TelegramSignInRequest) => {
+  const handleTelegramAuth = async (idToken: string) => {
     setError("");
     try {
-      await telegramSignIn(data);
+      await telegramSignIn({ id_token: idToken, role: "shipper" });
       navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err));
@@ -112,9 +111,10 @@ export default function LoginPage() {
               </Button>
 
               <TelegramLoginButton
-                botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
-                origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
+                clientId={import.meta.env.VITE_TELEGRAM_CLIENT_ID ?? ""}
+                redirectUri={`${window.location.origin}/auth/telegram/callback`}
                 onAuth={handleTelegramAuth}
+                onError={(e) => setError(e.message)}
                 disabled={isLoading}
               >
                 {t("auth_continue_telegram")}

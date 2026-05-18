@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
+import TelegramCallbackPage from "@/pages/telegram-callback";
 import DashboardPage from "@/pages/dashboard";
 import CreateCompanyPage from "@/pages/create-company";
 import CompanySettingsPage from "@/pages/company-settings";
@@ -19,6 +20,7 @@ export function AppRouter() {
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/auth/telegram/callback" element={<TelegramCallbackPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms-of-service" element={<TermsOfServicePage />} />
 
