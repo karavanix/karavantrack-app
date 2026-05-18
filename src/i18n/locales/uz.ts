@@ -60,6 +60,12 @@ const uz = {
   register_and: "va",
   register_privacy_link: "Maxfiylik siyosati",
 
+  // Auth — Social login
+  auth_or_continue_with: "Yoki orqali davom eting",
+  auth_continue_telegram: "Telegram orqali kirish",
+  auth_or_sign_up_with: "Yoki orqali ro'yxatdan o'ting",
+  auth_sign_up_telegram: "Telegram orqali ro'yxatdan o'tish",
+
   // Auth — Verify Email
   verify_title: "Emailingizni tekshiring",
   verify_subtitle: "{{email}} manziliga 6 raqamli kod yubordik",

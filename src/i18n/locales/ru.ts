@@ -60,6 +60,12 @@ const ru = {
   register_and: "и",
   register_privacy_link: "Политику конфиденциальности",
 
+  // Auth — Social login
+  auth_or_continue_with: "Или продолжить через",
+  auth_continue_telegram: "Войти через Telegram",
+  auth_or_sign_up_with: "Или зарегистрироваться через",
+  auth_sign_up_telegram: "Зарегистрироваться через Telegram",
+
   // Auth — Verify Email
   verify_title: "Проверьте почту",
   verify_subtitle: "Мы отправили 6-значный код на {{email}}",

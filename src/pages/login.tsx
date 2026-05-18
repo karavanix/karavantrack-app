@@ -9,14 +9,26 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle } from "lucide-react";
+import { TelegramLoginButton } from "@/components/telegram-login-button";
+import type { TelegramSignInRequest } from "@/types";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { login, isLoading } = useAuthStore();
+  const { login, telegramSignIn, isLoading } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  const handleTelegramAuth = async (data: TelegramSignInRequest) => {
+    setError("");
+    try {
+      await telegramSignIn(data);
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +118,27 @@ export default function LoginPage() {
                 </Link>
               </p>
             </form>
+
+            {/* ── Social login ── */}
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/50" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-card px-3 text-muted-foreground">
+                  {t("auth_or_continue_with")}
+                </span>
+              </div>
+            </div>
+
+            <TelegramLoginButton
+              botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
+              origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
+              onAuth={handleTelegramAuth}
+              disabled={isLoading}
+            >
+              {t("auth_continue_telegram")}
+            </TelegramLoginButton>
           </CardContent>
         </Card>
       </div>

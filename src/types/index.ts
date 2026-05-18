@@ -19,6 +19,23 @@ export interface AuthTokens {
   refresh_token: string;
 }
 
+// ──── Telegram OAuth ────
+export interface TelegramSignInRequest {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: string;
+  hash: string;
+  role?: "shipper" | "carrier";
+}
+
+export interface TelegramSignInResponse extends AuthTokens {
+  role: string;
+  is_new_user: boolean;
+}
+
 // ──── Email Verification ────
 export interface VerifyEmailRequest {
   email: string;

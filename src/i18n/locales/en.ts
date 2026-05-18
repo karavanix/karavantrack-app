@@ -60,6 +60,12 @@ const en = {
   register_and: "and",
   register_privacy_link: "Privacy Policy",
 
+  // Auth — Social login
+  auth_or_continue_with: "Or continue with",
+  auth_continue_telegram: "Continue with Telegram",
+  auth_or_sign_up_with: "Or sign up with",
+  auth_sign_up_telegram: "Sign up with Telegram",
+
   // Auth — Verify Email
   verify_title: "Check your email",
   verify_subtitle: "We sent a 6-digit code to {{email}}",
