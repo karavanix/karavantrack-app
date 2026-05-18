@@ -111,6 +111,15 @@ export default function LoginPage() {
                 )}
               </Button>
 
+              <TelegramLoginButton
+                botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
+                origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
+                onAuth={handleTelegramAuth}
+                disabled={isLoading}
+              >
+                {t("auth_continue_telegram")}
+              </TelegramLoginButton>
+
               <p className="text-center text-sm text-muted-foreground">
                 {t("login_no_account")}{" "}
                 <Link to="/register" className="font-medium text-primary hover:underline">
@@ -118,27 +127,6 @@ export default function LoginPage() {
                 </Link>
               </p>
             </form>
-
-            {/* ── Social login ── */}
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border/50" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-3 text-muted-foreground">
-                  {t("auth_or_continue_with")}
-                </span>
-              </div>
-            </div>
-
-            <TelegramLoginButton
-              botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
-              origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
-              onAuth={handleTelegramAuth}
-              disabled={isLoading}
-            >
-              {t("auth_continue_telegram")}
-            </TelegramLoginButton>
           </CardContent>
         </Card>
       </div>

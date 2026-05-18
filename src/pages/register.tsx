@@ -307,6 +307,15 @@ export default function RegisterPage() {
                   )}
                 </Button>
 
+                <TelegramLoginButton
+                  botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
+                  origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
+                  onAuth={handleTelegramAuth}
+                  disabled={isLoading}
+                >
+                  {t("auth_sign_up_telegram")}
+                </TelegramLoginButton>
+
                 <p className="text-center text-sm text-muted-foreground">
                   {t("register_already_account")}{" "}
                   <Link to="/login" className="font-medium text-primary hover:underline">
@@ -314,27 +323,6 @@ export default function RegisterPage() {
                   </Link>
                 </p>
               </form>
-
-              {/* ── Social sign-up ── */}
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border/50" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-card px-3 text-muted-foreground">
-                    {t("auth_or_sign_up_with")}
-                  </span>
-                </div>
-              </div>
-
-              <TelegramLoginButton
-                botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
-                origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
-                onAuth={handleTelegramAuth}
-                disabled={isLoading}
-              >
-                {t("auth_sign_up_telegram")}
-              </TelegramLoginButton>
             </CardContent>
           </Card>
         ) : (
