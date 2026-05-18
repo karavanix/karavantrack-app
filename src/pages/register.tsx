@@ -9,13 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle, ArrowLeft, CheckSquare, Mail, Square } from "lucide-react";
+import { TelegramLoginButton } from "@/components/telegram-login-button";
+import type { TelegramSignInRequest } from "@/types";
 
 type Step = "form" | "verify";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { register, verifyEmail, isLoading } = useAuthStore();
+  const { register, verifyEmail, telegramSignIn, isLoading } = useAuthStore();
   const [step, setStep] = useState<Step>("form");
   const [form, setForm] = useState({
     first_name: "",
@@ -65,6 +67,16 @@ export default function RegisterPage() {
         role: "shipper",
       });
       setStep("verify");
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    }
+  };
+
+  const handleTelegramAuth = async (data: TelegramSignInRequest) => {
+    setError("");
+    try {
+      await telegramSignIn(data);
+      navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err));
     }
@@ -302,6 +314,27 @@ export default function RegisterPage() {
                   </Link>
                 </p>
               </form>
+
+              {/* ── Social sign-up ── */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/50" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-card px-3 text-muted-foreground">
+                    {t("auth_or_sign_up_with")}
+                  </span>
+                </div>
+              </div>
+
+              <TelegramLoginButton
+                botId={import.meta.env.VITE_TELEGRAM_BOT_ID ?? ""}
+                origin={import.meta.env.VITE_TELEGRAM_ORIGIN ?? window.location.origin}
+                onAuth={handleTelegramAuth}
+                disabled={isLoading}
+              >
+                {t("auth_sign_up_telegram")}
+              </TelegramLoginButton>
             </CardContent>
           </Card>
         ) : (

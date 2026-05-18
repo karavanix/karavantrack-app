@@ -8,6 +8,8 @@ import type {
   AuthTokens,
   VerifyEmailRequest,
   VerifyEmailResponse,
+  TelegramSignInRequest,
+  TelegramSignInResponse,
 } from "@/types";
 
 interface AuthState {
@@ -22,6 +24,7 @@ interface AuthState {
   register: (req: RegisterRequest) => Promise<void>;
   verifyEmail: (req: VerifyEmailRequest) => Promise<void>;
   fetchMe: () => Promise<void>;
+  telegramSignIn: (req: TelegramSignInRequest) => Promise<void>;
   logout: () => void;
   isAuthenticated: () => boolean;
 }
@@ -84,6 +87,20 @@ export const useAuthStore = create<AuthState>()(
       fetchMe: async () => {
         const { data } = await api.get<User>("/users/me");
         set({ user: data });
+      },
+
+      telegramSignIn: async (req) => {
+        set({ isLoading: true });
+        try {
+          const { data } = await api.post<TelegramSignInResponse>("/auth/telegram", req);
+          set({
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+          });
+          await get().fetchMe();
+        } finally {
+          set({ isLoading: false });
+        }
       },
 
       logout: () => {
