@@ -19,10 +19,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleTelegramAuth = async (idToken: string) => {
+  const handleTelegramAuth = async (code: string, redirectUri: string) => {
     setError("");
     try {
-      await telegramSignIn({ id_token: idToken, role: "shipper" });
+      await telegramSignIn({ code, redirect_uri: redirectUri, role: "shipper" });
       navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err));

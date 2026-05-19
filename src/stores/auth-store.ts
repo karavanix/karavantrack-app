@@ -92,7 +92,7 @@ export const useAuthStore = create<AuthState>()(
       telegramSignIn: async (req) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post<TelegramSignInResponse>("/auth/telegram", req);
+          const { data } = await api.post<TelegramSignInResponse>("/auth/telegram/callback", req);
           set({
             accessToken: data.access_token,
             refreshToken: data.refresh_token,

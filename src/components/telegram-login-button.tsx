@@ -1,43 +1,14 @@
 import { Button } from "@/components/ui/button";
 
 const TELEGRAM_AUTH_URL = "https://oauth.telegram.org/auth";
-const TELEGRAM_TOKEN_URL = "https://oauth.telegram.org/token";
 
 interface TelegramLoginButtonProps {
   clientId: string;
   redirectUri: string;
-  onAuth: (idToken: string) => void;
+  onAuth: (code: string, redirectUri: string) => void;
   onError?: (err: Error) => void;
   children: React.ReactNode;
   disabled?: boolean;
-}
-
-async function exchangeCode(
-  code: string,
-  clientId: string,
-  clientSecret: string,
-  redirectUri: string
-): Promise<string> {
-  const res = await fetch(TELEGRAM_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-    }).toString(),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Telegram token exchange failed: ${res.status}`);
-  }
-
-  const json = await res.json();
-  if (!json.id_token) throw new Error("Telegram: no id_token in token response");
-  return json.id_token as string;
 }
 
 export function TelegramLoginButton({
@@ -66,9 +37,7 @@ export function TelegramLoginButton({
       "width=550,height=470,left=200,top=100"
     );
 
-    const clientSecret = import.meta.env.VITE_TELEGRAM_CLIENT_SECRET ?? "";
-
-    const handler = async (event: MessageEvent) => {
+    const handler = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (!event.data || event.data.type !== "telegram_oauth_callback") return;
 
@@ -88,13 +57,7 @@ export function TelegramLoginButton({
       }
       sessionStorage.removeItem("tg_oauth_state");
 
-      try {
-        const idToken = await exchangeCode(code, clientId, clientSecret, redirectUri);
-        onAuth(idToken);
-      } catch (err) {
-        const e = err instanceof Error ? err : new Error(String(err));
-        onError ? onError(e) : console.error(e);
-      }
+      onAuth(code, redirectUri);
     };
 
     window.addEventListener("message", handler);

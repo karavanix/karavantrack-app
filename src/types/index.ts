@@ -21,7 +21,8 @@ export interface AuthTokens {
 
 // ──── Telegram OAuth ────
 export interface TelegramSignInRequest {
-  id_token: string;
+  code: string;
+  redirect_uri: string;
   role?: "shipper" | "carrier";
 }
 

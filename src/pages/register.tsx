@@ -71,10 +71,10 @@ export default function RegisterPage() {
     }
   };
 
-  const handleTelegramAuth = async (idToken: string) => {
+  const handleTelegramAuth = async (code: string, redirectUri: string) => {
     setError("");
     try {
-      await telegramSignIn({ id_token: idToken, role: "shipper" });
+      await telegramSignIn({ code, redirect_uri: redirectUri, role: "carrier" });
       navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err));
