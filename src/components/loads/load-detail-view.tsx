@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
 import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
+import { CopyLinkPanel } from "@/components/shared/copy-link-panel";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +47,7 @@ import {
   Search,
   Timer,
   ExternalLink,
+  Share2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type {
@@ -54,6 +57,8 @@ import type {
   TrackPoint,
   TrackResponse,
   PaginatedResponse,
+  InviteLinkResponse,
+  TrackingLinkResponse,
 } from "@/types";
 import { utcToLocalDisplay, utcToLocalTimeDisplay } from "@/lib/date-utils";
 
@@ -87,6 +92,7 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
   const [error, setError] = useState("");
 
   const [assignOpen, setAssignOpen] = useState(false);
+  const [assignTab, setAssignTab] = useState<"existing" | "invite">("existing");
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [carriersLoading, setCarriersLoading] = useState(false);
   const [selectedCarrierId, setSelectedCarrierId] = useState("");
@@ -96,6 +102,7 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [assignedCarrier, setAssignedCarrier] = useState<Carrier | null>(null);
+  const [trackingLinkOpen, setTrackingLinkOpen] = useState(false);
 
   const TRACKABLE_STATUSES = [
     "assigned", "accepted",
@@ -393,7 +400,7 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
       {/* ── Main split layout ── */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
         {/* ── Map ── */}
-        <div className="h-[280px] lg:h-auto lg:flex-1 lg:order-2 lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-l">
+        <div className="relative h-[280px] lg:h-auto lg:flex-1 lg:order-2 lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-l">
           <MapLibreTrackingMap
             className="h-full w-full"
             pickup={pickup}
@@ -403,6 +410,17 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
             trackPoints={trackPoints.map((p) => ({ lat: p.lat, lng: p.lng }))}
             trackable={isTrackable}
           />
+          <div className="absolute top-3 right-3 z-20">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setTrackingLinkOpen(true)}
+              className="gap-1.5 shadow-md"
+            >
+              <Share2 size={14} />
+              {t("load_detail_share_tracking")}
+            </Button>
+          </div>
         </div>
 
         {/* ── Info panel ── */}
@@ -592,7 +610,7 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
         open={assignOpen}
         onOpenChange={(open) => {
           setAssignOpen(open);
-          if (!open) { setAssignCarrierSearch(""); setSelectedCarrierId(""); }
+          if (!open) { setAssignCarrierSearch(""); setSelectedCarrierId(""); setAssignTab("existing"); }
         }}
       >
         <DialogContent className="max-w-md">
@@ -608,92 +626,153 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
             </div>
           )}
 
-          {carriersLoading ? (
-            <div className="flex justify-center py-6">
-              <Spinner size={20} />
-            </div>
-          ) : carriers.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              {t("load_detail_no_carriers")}{" "}
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => { setAssignOpen(false); navigate("/carriers"); }}
-              >
-                {t("load_detail_add_carrier_link")}
-              </button>
-            </p>
-          ) : (() => {
-            const q = assignCarrierSearch.toLowerCase();
-            const filtered = q
-              ? carriers.filter((c) => {
-                  const name = `${c.first_name} ${c.last_name}`.toLowerCase();
-                  return name.includes(q) || c.alias?.toLowerCase().includes(q);
-                })
-              : carriers;
-            return (
-              <>
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder={t("load_detail_carrier_search_placeholder")}
-                    value={assignCarrierSearch}
-                    onChange={(e) => setAssignCarrierSearch(e.target.value)}
-                    className="pl-9"
-                  />
+          <Tabs value={assignTab} onValueChange={(v) => setAssignTab(v as "existing" | "invite")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="existing">{t("load_detail_assign_tab_existing")}</TabsTrigger>
+              <TabsTrigger value="invite">{t("load_detail_assign_tab_invite")}</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="existing" className="space-y-3">
+              {carriersLoading ? (
+                <div className="flex justify-center py-6">
+                  <Spinner size={20} />
                 </div>
-                <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border p-1">
-                  {filtered.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-muted-foreground">
-                      {t("load_detail_carrier_no_results")}
-                    </p>
-                  ) : (
-                    filtered.map((carrier) => (
-                      <button
-                        key={carrier.carrier_id}
-                        type="button"
-                        onClick={() => setSelectedCarrierId(carrier.carrier_id)}
-                        className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
-                          selectedCarrierId === carrier.carrier_id
-                            ? "bg-primary/10 text-primary"
-                            : "hover:bg-muted"
-                        }`}
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                          {carrier.first_name?.[0]}
-                          {carrier.last_name?.[0]}
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {carrier.alias || `${carrier.first_name} ${carrier.last_name}`.trim()}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs text-muted-foreground">
-                              {carrier.first_name} {carrier.last_name}
-                            </p>
-                            <Badge
-                              variant={carrier.is_free ? "success" : "secondary"}
-                              className="px-1.5 py-0 text-[10px]"
-                            >
-                              {carrier.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
-                            </Badge>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </>
-            );
-          })()}
+              ) : carriers.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  {t("load_detail_no_carriers")}{" "}
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => { setAssignOpen(false); navigate("/carriers"); }}
+                  >
+                    {t("load_detail_add_carrier_link")}
+                  </button>
+                </p>
+              ) : (() => {
+                const q = assignCarrierSearch.toLowerCase();
+                const filtered = q
+                  ? carriers.filter((c) => {
+                      const name = `${c.first_name} ${c.last_name}`.toLowerCase();
+                      return name.includes(q) || c.alias?.toLowerCase().includes(q);
+                    })
+                  : carriers;
+                return (
+                  <>
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder={t("load_detail_carrier_search_placeholder")}
+                        value={assignCarrierSearch}
+                        onChange={(e) => setAssignCarrierSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border p-1">
+                      {filtered.length === 0 ? (
+                        <p className="py-4 text-center text-xs text-muted-foreground">
+                          {t("load_detail_carrier_no_results")}
+                        </p>
+                      ) : (
+                        filtered.map((carrier) => (
+                          <button
+                            key={carrier.carrier_id}
+                            type="button"
+                            onClick={() => setSelectedCarrierId(carrier.carrier_id)}
+                            className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
+                              selectedCarrierId === carrier.carrier_id
+                                ? "bg-primary/10 text-primary"
+                                : "hover:bg-muted"
+                            }`}
+                          >
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                              {carrier.first_name?.[0]}
+                              {carrier.last_name?.[0]}
+                            </div>
+                            <div>
+                              <p className="font-medium">
+                                {carrier.alias || `${carrier.first_name} ${carrier.last_name}`.trim()}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-muted-foreground">
+                                  {carrier.first_name} {carrier.last_name}
+                                </p>
+                                <Badge
+                                  variant={carrier.is_free ? "success" : "secondary"}
+                                  className="px-1.5 py-0 text-[10px]"
+                                >
+                                  {carrier.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
+                                </Badge>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </TabsContent>
+
+            <TabsContent value="invite">
+              <CopyLinkPanel
+                description={t("load_detail_invite_link_desc")}
+                generateLabel={t("load_detail_generate_invite_link")}
+                onGenerate={async () => {
+                  const { data } = await api.post<InviteLinkResponse>(
+                    `/loads/${loadId}/invite-link`
+                  );
+                  return {
+                    url: data.url,
+                    note: data.expires_at
+                      ? `${t("load_detail_invite_link_expires")} ${utcToLocalDisplay(data.expires_at)}`
+                      : undefined,
+                  };
+                }}
+              />
+            </TabsContent>
+          </Tabs>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignOpen(false)}>
-              {t("common_cancel")}
-            </Button>
-            <Button onClick={handleAssign} disabled={!selectedCarrierId || assignLoading}>
-              {assignLoading && <Spinner size={16} className="text-primary-foreground" />}
-              {t("load_detail_assign_carrier")}
+            {assignTab === "existing" ? (
+              <>
+                <Button variant="outline" onClick={() => setAssignOpen(false)}>
+                  {t("common_cancel")}
+                </Button>
+                <Button onClick={handleAssign} disabled={!selectedCarrierId || assignLoading}>
+                  {assignLoading && <Spinner size={16} className="text-primary-foreground" />}
+                  {t("load_detail_assign_carrier")}
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" onClick={() => setAssignOpen(false)}>
+                {t("common_close")}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Tracking Link Dialog ── */}
+      <Dialog open={trackingLinkOpen} onOpenChange={setTrackingLinkOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("load_detail_share_tracking")}</DialogTitle>
+            <DialogDescription>{t("load_detail_share_tracking_desc")}</DialogDescription>
+          </DialogHeader>
+
+          <CopyLinkPanel
+            generateLabel={t("load_detail_generate_tracking_link")}
+            onGenerate={async () => {
+              const { data } = await api.post<TrackingLinkResponse>(
+                `/loads/${loadId}/tracking-link`
+              );
+              return { url: data.url };
+            }}
+          />
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrackingLinkOpen(false)}>
+              {t("common_close")}
             </Button>
           </DialogFooter>
         </DialogContent>

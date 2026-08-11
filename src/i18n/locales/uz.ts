@@ -279,6 +279,47 @@ const uz = {
   load_detail_not_found: "Yuk topilmadi",
   load_detail_not_found_desc: "Qidirilgan yuk mavjud emas.",
 
+  // Load Detail — tayinlash oynasi bo'limlari
+  load_detail_assign_tab_existing: "Mavjud tashuvchi",
+  load_detail_assign_tab_invite: "Havola orqali taklif qilish",
+  load_detail_invite_link_desc:
+    "Havola yarating va uni haydovchiga yuboring — u ilovada yukni qabul qilishi mumkin, siz esa uning telefon raqami yoki emailini oldindan bilishingiz shart emas.",
+  load_detail_generate_invite_link: "Taklif havolasini yaratish",
+  load_detail_invite_link_expires: "Havola muddati:",
+
+  // Load Detail — kuzatuv havolasi
+  load_detail_share_tracking: "Kuzatuvni ulashish",
+  load_detail_share_tracking_desc:
+    "Mijozingiz tizimga kirmasdan yukning joylashuvini kuzatishi uchun ochiq havola yarating.",
+  load_detail_generate_tracking_link: "Kuzatuv havolasini yaratish",
+
+  // Havolani nusxalash (umumiy)
+  copy_link_copy: "Nusxalash",
+  copy_link_copied: "Havola nusxalandi",
+  copy_link_copy_failed: "Havolani nusxalab bo'lmadi",
+  copy_link_regenerate: "Yangi havola yaratish",
+
+  // Ochiq taklif sahifasi
+  invite_page_loading: "Taklif yuklanmoqda...",
+  invite_page_invalid_link: "Havola yaroqsiz",
+  invite_page_invalid_link_desc: "Taklif havolasi noto'g'ri yoki endi mavjud emas.",
+  invite_page_error_desc: "Taklifni yuklab bo'lmadi. Keyinroq qayta urinib ko'ring.",
+  invite_page_status_pending_desc: "Yukni qabul qilish uchun bu havolani telefoningizda oching",
+  invite_page_open_app: "Ilovada ochish",
+  invite_page_download_ios: "App Store",
+  invite_page_download_android: "Google Play",
+  invite_page_status_accepted_desc: "Yuk allaqachon haydovchi tomonidan qabul qilingan.",
+  invite_page_status_expired_desc: "Taklif havolasining muddati tugagan.",
+  invite_page_status_revoked_desc: "Bu taklif havolasi yuboruvchi tomonidan bekor qilingan.",
+
+  // Ochiq kuzatuv sahifasi
+  tracking_page_loading: "Kuzatuv ma'lumotlari yuklanmoqda...",
+  tracking_page_invalid_link: "Havola yaroqsiz",
+  tracking_page_invalid_link_desc: "Kuzatuv havolasi noto'g'ri yoki endi mavjud emas.",
+  tracking_page_error_desc: "Yuk kuzatuvini yuklab bo'lmadi. Keyinroq qayta urinib ko'ring.",
+  tracking_page_last_update: "Oxirgi yangilanish",
+  tracking_page_not_trackable: "Bu yuk uchun real vaqt kuzatuvi hali mavjud emas.",
+
   // Common
   common_cancel: "Bekor qilish",
   common_save: "Saqlash",
@@ -286,6 +327,7 @@ const uz = {
   common_loading: "Yuklanmoqda...",
   common_reload: "Yangilash",
   common_error: "Xatolik yuz berdi",
+  common_close: "Yopish",
 };
 
 export default uz;

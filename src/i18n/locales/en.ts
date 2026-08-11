@@ -309,6 +309,47 @@ const en = {
   load_detail_not_found: "Load not found",
   load_detail_not_found_desc: "The load you are looking for does not exist.",
 
+  // Load Detail — assign dialog tabs
+  load_detail_assign_tab_existing: "Existing carrier",
+  load_detail_assign_tab_invite: "Invite by link",
+  load_detail_invite_link_desc:
+    "Generate a link and send it to a driver — they can accept the load in the app without you needing their phone or email up front.",
+  load_detail_generate_invite_link: "Generate invite link",
+  load_detail_invite_link_expires: "Link expires:",
+
+  // Load Detail — tracking link
+  load_detail_share_tracking: "Share tracking",
+  load_detail_share_tracking_desc:
+    "Generate a public link so your client can follow this load's location without logging in.",
+  load_detail_generate_tracking_link: "Generate tracking link",
+
+  // Copy link (shared)
+  copy_link_copy: "Copy",
+  copy_link_copied: "Link copied to clipboard",
+  copy_link_copy_failed: "Couldn't copy the link",
+  copy_link_regenerate: "Generate new link",
+
+  // Public invite page
+  invite_page_loading: "Loading invite...",
+  invite_page_invalid_link: "This link isn't valid",
+  invite_page_invalid_link_desc: "The invite link is incorrect or no longer exists.",
+  invite_page_error_desc: "We couldn't load this invite. Please try again later.",
+  invite_page_status_pending_desc: "Open this link on your phone to accept the load",
+  invite_page_open_app: "Open in app",
+  invite_page_download_ios: "App Store",
+  invite_page_download_android: "Google Play",
+  invite_page_status_accepted_desc: "This load has already been accepted by a driver.",
+  invite_page_status_expired_desc: "This invite link has expired.",
+  invite_page_status_revoked_desc: "This invite link was revoked by the shipper.",
+
+  // Public tracking page
+  tracking_page_loading: "Loading tracking...",
+  tracking_page_invalid_link: "This link isn't valid",
+  tracking_page_invalid_link_desc: "The tracking link is incorrect or no longer exists.",
+  tracking_page_error_desc: "We couldn't load tracking for this load. Please try again later.",
+  tracking_page_last_update: "Last update",
+  tracking_page_not_trackable: "Live tracking isn't available for this load yet.",
+
   // Common
   common_cancel: "Cancel",
   common_save: "Save",
@@ -316,6 +357,7 @@ const en = {
   common_loading: "Loading...",
   common_reload: "Reload",
   common_error: "Something went wrong",
+  common_close: "Close",
 };
 
 export default en;
