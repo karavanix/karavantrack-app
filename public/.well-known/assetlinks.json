@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "yool.live.app",
-      "sha256_cert_fingerprints": ["REPLACE_WITH_REAL_RELEASE_SIGNING_SHA256_FINGERPRINT"]
+      "sha256_cert_fingerprints": ["54:A5:1F:74:99:82:5D:11:AB:6E:07:50:6C:F5:C8:EC:42:4D:92:AD:E0:A4:BE:07:2A:FC:AC:6E:78:93:AC:DE"]
     }
   }
 ]
