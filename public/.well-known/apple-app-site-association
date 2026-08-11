@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "C262CX9W5K.live.yool.app",
+        "paths": ["/invite/*", "/track/*"]
+      }
+    ]
+  }
+}

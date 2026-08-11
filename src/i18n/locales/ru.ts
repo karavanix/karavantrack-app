@@ -306,6 +306,47 @@ const ru = {
   load_detail_not_found: "Груз не найден",
   load_detail_not_found_desc: "Запрашиваемый груз не существует.",
 
+  // Load Detail — вкладки назначения
+  load_detail_assign_tab_existing: "Существующий перевозчик",
+  load_detail_assign_tab_invite: "Пригласить по ссылке",
+  load_detail_invite_link_desc:
+    "Создайте ссылку и отправьте её водителю — он сможет принять груз в приложении, а вам не нужно заранее знать его телефон или email.",
+  load_detail_generate_invite_link: "Создать ссылку-приглашение",
+  load_detail_invite_link_expires: "Ссылка действует до:",
+
+  // Load Detail — ссылка на отслеживание
+  load_detail_share_tracking: "Поделиться отслеживанием",
+  load_detail_share_tracking_desc:
+    "Создайте публичную ссылку, чтобы клиент мог следить за местоположением груза без входа в систему.",
+  load_detail_generate_tracking_link: "Создать ссылку отслеживания",
+
+  // Копирование ссылки (общее)
+  copy_link_copy: "Копировать",
+  copy_link_copied: "Ссылка скопирована",
+  copy_link_copy_failed: "Не удалось скопировать ссылку",
+  copy_link_regenerate: "Создать новую ссылку",
+
+  // Публичная страница приглашения
+  invite_page_loading: "Загрузка приглашения...",
+  invite_page_invalid_link: "Ссылка недействительна",
+  invite_page_invalid_link_desc: "Ссылка-приглашение неверна или больше не существует.",
+  invite_page_error_desc: "Не удалось загрузить приглашение. Попробуйте позже.",
+  invite_page_status_pending_desc: "Откройте эту ссылку на телефоне, чтобы принять груз",
+  invite_page_open_app: "Открыть в приложении",
+  invite_page_download_ios: "App Store",
+  invite_page_download_android: "Google Play",
+  invite_page_status_accepted_desc: "Груз уже принят водителем.",
+  invite_page_status_expired_desc: "Срок действия ссылки-приглашения истёк.",
+  invite_page_status_revoked_desc: "Эта ссылка-приглашение была отозвана отправителем.",
+
+  // Публичная страница отслеживания
+  tracking_page_loading: "Загрузка данных отслеживания...",
+  tracking_page_invalid_link: "Ссылка недействительна",
+  tracking_page_invalid_link_desc: "Ссылка отслеживания неверна или больше не существует.",
+  tracking_page_error_desc: "Не удалось загрузить отслеживание груза. Попробуйте позже.",
+  tracking_page_last_update: "Последнее обновление",
+  tracking_page_not_trackable: "Отслеживание в реальном времени пока недоступно для этого груза.",
+
   // Common
   common_cancel: "Отмена",
   common_save: "Сохранить",
@@ -313,6 +354,7 @@ const ru = {
   common_loading: "Загрузка...",
   common_reload: "Обновить",
   common_error: "Что-то пошло не так",
+  common_close: "Закрыть",
 };
 
 export default ru;

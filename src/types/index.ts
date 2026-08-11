@@ -263,6 +263,60 @@ export interface AssignLoadRequest {
   attachment_ids?: string[];
 }
 
+// ──── Invite link (shareable, no phone/email required up front) ────
+export type InviteStatus = "pending" | "accepted" | "expired" | "revoked";
+
+export interface InviteLinkResponse {
+  token: string;
+  url: string;
+  expires_at: string;
+}
+
+export interface InviteLoadSummary {
+  reference_id: string;
+  title: string;
+  pickup_address: string;
+  pickup_at: string;
+  dropoff_address: string;
+  dropoff_at: string;
+  company_name: string;
+}
+
+export interface InvitePublicResponse {
+  status: InviteStatus;
+  load: InviteLoadSummary;
+}
+
+export interface InviteAcceptResponse {
+  load_id: string;
+}
+
+// ──── Tracking link (public, no-login) ────
+export interface TrackingLinkResponse {
+  token: string;
+  url: string;
+}
+
+export interface PublicTrackingPoint {
+  address: string;
+  lat: number;
+  lng: number;
+  at: string;
+}
+
+export interface PublicTrackingLoad {
+  reference_id: string;
+  title: string;
+  status: LoadStatus;
+  pickup: PublicTrackingPoint;
+  dropoff: PublicTrackingPoint;
+}
+
+export interface PublicTrackingResponse {
+  load: PublicTrackingLoad;
+  position: Position | null;
+}
+
 // ──── Tracking ────
 export interface Position {
   load_id: string;
