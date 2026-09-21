@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
+import { useConnectionStatus } from "@/hooks/use-connection-status";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
+import { ConnectionStatusBadge } from "@/components/loads/connection-status-badge";
 import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
 import { CopyLinkPanel } from "@/components/shared/copy-link-panel";
 import {
@@ -112,10 +114,15 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
   ];
   const isTrackable = load != null && TRACKABLE_STATUSES.includes(load.status);
 
-  const { isConnected } = useLoadPositionWS({
+  useLoadPositionWS({
     loadId,
     enabled: !!isTrackable,
     onPosition: (pos) => setPosition(pos),
+  });
+
+  const { status: connectionStatus } = useConnectionStatus({
+    loadId,
+    enabled: !!isTrackable,
   });
 
   const fetchLoad = useCallback(async () => {
@@ -312,12 +319,7 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
                 {load.reference_id && (
                   <code className="text-[11px] text-muted-foreground">#{load.reference_id}</code>
                 )}
-                {isTrackable && (
-                  <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
-                    <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
-                    {isConnected ? "Live" : t("load_detail_ws_offline")}
-                  </Badge>
-                )}
+                {isTrackable && <ConnectionStatusBadge status={connectionStatus} />}
               </div>
             </div>
           </div>

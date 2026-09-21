@@ -315,6 +315,18 @@ export interface PublicTrackingLoad {
 export interface PublicTrackingResponse {
   load: PublicTrackingLoad;
   position: Position | null;
+  connection?: ConnectionStatus;
+}
+
+// ──── Connection status ────
+// Whether the driver's phone is actually reachable and streaming GPS for a
+// load — as opposed to whether *this browser* has a WebSocket open.
+export type ConnectionState = "not_started" | "live" | "economy" | "disconnected" | "gps_disabled";
+
+export interface ConnectionStatus {
+  state: ConnectionState;
+  reason?: string;
+  last_point_at?: string;
 }
 
 // ──── Tracking ────
