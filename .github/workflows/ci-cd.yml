@@ -11,7 +11,32 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # Runs on every push and PR — no tests exist yet, so this is a typecheck
+  # gate only. eslint has pre-existing findings on this codebase (backlog),
+  # so it isn't wired in here to avoid blocking on unrelated debt.
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b
+
+  # Docker image build + push. Only on push to main — this used to also run
+  # (and its sibling `deploy` job below with it) on every pull_request,
+  # meaning opening a PR pushed an image and deployed it to production.
   build:
+    if: github.event_name == 'push'
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,6 +77,7 @@ jobs:
             VITE_TELEGRAM_CLIENT_ID=${{ vars.VITE_TELEGRAM_CLIENT_ID }}
 
   deploy:
+    if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
 
