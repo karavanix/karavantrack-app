@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
-import { MapPin, Navigation, Calendar, User } from "lucide-react";
+import { MapPin, Navigation, Calendar, User, UserPlus } from "lucide-react";
 import type { Load } from "@/types";
 import { utcToLocalDateDisplay } from "@/lib/date-utils";
 import { truncate } from "@/lib/string-utils";
@@ -10,10 +12,12 @@ interface LoadCardProps {
   load: Load;
   carrierMap: Record<string, string>;
   onQuickView?: (loadId: string) => void;
+  onAssign?: (loadId: string) => void;
 }
 
-export function LoadCard({ load, carrierMap, onQuickView }: LoadCardProps) {
+export function LoadCard({ load, carrierMap, onQuickView, onAssign }: LoadCardProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const carrierName = load.carrier_id ? (carrierMap[load.carrier_id] ?? null) : null;
 
@@ -68,6 +72,19 @@ export function LoadCard({ load, carrierMap, onQuickView }: LoadCardProps) {
             <Calendar size={10} className="text-muted-foreground shrink-0" />
             <p className="text-[10px] text-muted-foreground">{utcToLocalDateDisplay(load.pickup_at)}</p>
           </div>
+        )}
+
+        {/* Assign action — only for loads not yet assigned */}
+        {load.status === "created" && onAssign && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 gap-1.5 text-xs"
+            onClick={(e) => { e.stopPropagation(); onAssign(load.id); }}
+          >
+            <UserPlus size={12} />
+            {t("load_detail_assign_carrier")}
+          </Button>
         )}
       </CardContent>
     </Card>

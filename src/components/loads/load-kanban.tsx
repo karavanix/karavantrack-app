@@ -87,6 +87,17 @@ export function LoadKanban({
 }: LoadKanbanProps) {
   const [cancelledOpen, setCancelledOpen] = useState(false);
   const [quickViewId, setQuickViewId] = useState<string | null>(null);
+  const [assignTargetId, setAssignTargetId] = useState<string | null>(null);
+
+  const handleAssign = (loadId: string) => {
+    setAssignTargetId(loadId);
+    setQuickViewId(loadId);
+  };
+
+  const handleCloseQuickView = () => {
+    setQuickViewId(null);
+    setAssignTargetId(null);
+  };
 
   const cancelledCount = getCancelledCount(stats, cancelledLoads.length);
 
@@ -123,7 +134,13 @@ export function LoadKanban({
                 <p className="py-6 text-center text-[11px] text-muted-foreground/60">No loads</p>
               ) : (
                 data.loads.map((load) => (
-                  <LoadCard key={load.id} load={load} carrierMap={carrierMap} onQuickView={setQuickViewId} />
+                  <LoadCard
+                    key={load.id}
+                    load={load}
+                    carrierMap={carrierMap}
+                    onQuickView={setQuickViewId}
+                    onAssign={handleAssign}
+                  />
                 ))
               )}
 
@@ -210,7 +227,11 @@ export function LoadKanban({
         )}
       </div>
 
-      <LoadDetailModal loadId={quickViewId} onClose={() => setQuickViewId(null)} />
+      <LoadDetailModal
+        loadId={quickViewId}
+        onClose={handleCloseQuickView}
+        autoOpenAssign={!!assignTargetId && quickViewId === assignTargetId}
+      />
     </div>
   );
 }
