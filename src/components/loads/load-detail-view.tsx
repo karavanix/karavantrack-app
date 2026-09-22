@@ -12,6 +12,7 @@ import { ConnectionStatusBadge } from "@/components/loads/connection-status-badg
 import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
 import { CopyLinkPanel } from "@/components/shared/copy-link-panel";
 import { CarrierPicker } from "@/components/loads/carrier-picker";
+import { LoadHistoryTimeline } from "@/components/loads/load-history-timeline";
 import {
   Dialog,
   DialogContent,
@@ -609,6 +610,15 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                   {utcToLocalDisplay(load.updated_at)}
                 </p>
               </div>
+            </section>
+
+            <hr className="border-border" />
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("load_detail_history")}
+              </h2>
+              <LoadHistoryTimeline history={load.history ?? []} />
             </section>
           </div>
         </div>

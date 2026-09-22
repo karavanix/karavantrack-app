@@ -320,6 +320,12 @@ const ru = {
     "Создайте публичную ссылку, чтобы клиент мог следить за местоположением груза без входа в систему.",
   load_detail_generate_tracking_link: "Создать ссылку отслеживания",
 
+  // Детали груза — история статусов / фото-подтверждения
+  load_detail_history: "История",
+  load_detail_history_empty: "Изменений статуса пока нет.",
+  load_detail_history_photo_alt: "Фото вложения",
+  load_detail_history_photo_unavailable: "Фото недоступно",
+
   // Копирование ссылки (общее)
   copy_link_copy: "Копировать",
   copy_link_copied: "Ссылка скопирована",

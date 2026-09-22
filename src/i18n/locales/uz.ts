@@ -300,6 +300,12 @@ const uz = {
     "Mijozingiz tizimga kirmasdan yukning joylashuvini kuzatishi uchun ochiq havola yarating.",
   load_detail_generate_tracking_link: "Kuzatuv havolasini yaratish",
 
+  // Yuk tafsilotlari — status tarixi / POD fotosuratlari
+  load_detail_history: "Tarix",
+  load_detail_history_empty: "Hozircha status o'zgarishlari yo'q.",
+  load_detail_history_photo_alt: "Ilova fotosurati",
+  load_detail_history_photo_unavailable: "Fotosurat mavjud emas",
+
   // Havolani nusxalash (umumiy)
   copy_link_copy: "Nusxalash",
   copy_link_copied: "Havola nusxalandi",

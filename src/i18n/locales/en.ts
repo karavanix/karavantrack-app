@@ -320,6 +320,12 @@ const en = {
     "Generate a public link so your client can follow this load's location without logging in.",
   load_detail_generate_tracking_link: "Generate tracking link",
 
+  // Load Detail — status history / POD photos
+  load_detail_history: "History",
+  load_detail_history_empty: "No status changes yet.",
+  load_detail_history_photo_alt: "Attachment photo",
+  load_detail_history_photo_unavailable: "Photo unavailable",
+
   // Copy link (shared)
   copy_link_copy: "Copy",
   copy_link_copied: "Link copied to clipboard",
