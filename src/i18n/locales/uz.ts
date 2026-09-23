@@ -243,6 +243,9 @@ const uz = {
   create_load_cancel: "Bekor qilish",
   create_load_creating: "Yaratilmoqda...",
   create_load_submit: "Yuk yaratish",
+  create_load_assign_step_title: "Yuk yaratildi",
+  create_load_assign_step_desc: "Hozir tashuvchi tayinlang yoki buni keyinroq kanban orqali qiling.",
+  create_load_assign_later: "Keyinroq hal qilish",
   create_load_error_no_company: "Avval kompaniyani tanlang",
   create_load_error_no_pickup: "Yuklash joyini belgilang: qidiring, havolani joylang yoki xaritani bosing",
   create_load_error_no_dropoff: "Tushirish joyini belgilang: qidiring, havolani joylang yoki xaritani bosing",
@@ -269,6 +272,10 @@ const uz = {
   load_detail_telemetry_heading: "Yo'nalish",
   load_detail_telemetry_accuracy: "Aniqlik",
   load_detail_ws_offline: "Oflayn",
+  load_detail_conn_live: "Jonli efir",
+  load_detail_conn_economy: "Aloqada",
+  load_detail_conn_disconnected: "Aloqa yo'q",
+  load_detail_conn_gps_disabled: "GPS o'chiq",
   load_detail_assign_dialog_desc: "Ushbu yukga tayinlash uchun kompaniyangizdan tashuvchini tanlang.",
   load_detail_no_carriers: "Bu kompaniyada tashuvchilar yo'q.",
   load_detail_add_carrier_link: "Avval qo'shing",
@@ -292,6 +299,12 @@ const uz = {
   load_detail_share_tracking_desc:
     "Mijozingiz tizimga kirmasdan yukning joylashuvini kuzatishi uchun ochiq havola yarating.",
   load_detail_generate_tracking_link: "Kuzatuv havolasini yaratish",
+
+  // Yuk tafsilotlari — status tarixi / POD fotosuratlari
+  load_detail_history: "Tarix",
+  load_detail_history_empty: "Hozircha status o'zgarishlari yo'q.",
+  load_detail_history_photo_alt: "Ilova fotosurati",
+  load_detail_history_photo_unavailable: "Fotosurat mavjud emas",
 
   // Havolani nusxalash (umumiy)
   copy_link_copy: "Nusxalash",

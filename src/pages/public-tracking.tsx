@@ -6,6 +6,7 @@ import { AlertTriangle, Calendar, Clock, MapPin, Navigation, Truck, XCircle } fr
 import { api } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
+import { ConnectionStatusBadge } from "@/components/loads/connection-status-badge";
 import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
 import { utcToLocalDisplay } from "@/lib/date-utils";
 import type { PublicTrackingResponse, TrackPoint, TrackResponse } from "@/types";
@@ -176,6 +177,7 @@ export default function PublicTrackingPage() {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <StatusBadge status={load.status} />
+            {isTrackable && <ConnectionStatusBadge status={data.connection ?? null} />}
             {load.reference_id && (
               <code className="text-[11px] text-muted-foreground">#{load.reference_id}</code>
             )}

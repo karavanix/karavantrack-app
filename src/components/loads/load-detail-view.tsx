@@ -4,12 +4,15 @@ import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
+import { useConnectionStatus } from "@/hooks/use-connection-status";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
+import { ConnectionStatusBadge } from "@/components/loads/connection-status-badge";
 import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
 import { CopyLinkPanel } from "@/components/shared/copy-link-panel";
+import { CarrierPicker } from "@/components/loads/carrier-picker";
+import { LoadHistoryTimeline } from "@/components/loads/load-history-timeline";
 import {
   Dialog,
   DialogContent,
@@ -44,12 +47,10 @@ import {
   Radio,
   Gauge,
   Clock,
-  Search,
   Timer,
   ExternalLink,
   Share2,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import type {
   Load,
   Carrier,
@@ -78,9 +79,10 @@ interface LoadDetailViewProps {
   loadId: string;
   isModal?: boolean;
   onClose?: () => void;
+  autoOpenAssign?: boolean;
 }
 
-export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps) {
+export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: LoadDetailViewProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { selectedCompanyId } = useCompanyStore();
@@ -112,10 +114,15 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
   ];
   const isTrackable = load != null && TRACKABLE_STATUSES.includes(load.status);
 
-  const { isConnected } = useLoadPositionWS({
+  useLoadPositionWS({
     loadId,
     enabled: !!isTrackable,
     onPosition: (pos) => setPosition(pos),
+  });
+
+  const { status: connectionStatus } = useConnectionStatus({
+    loadId,
+    enabled: !!isTrackable,
   });
 
   const fetchLoad = useCallback(async () => {
@@ -166,6 +173,14 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
   useEffect(() => {
     fetchLoad();
   }, [fetchLoad]);
+
+  useEffect(() => {
+    if (autoOpenAssign && load?.status === "created" && !assignOpen) {
+      setAssignOpen(true);
+      fetchCarriers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenAssign, load?.status]);
 
   useEffect(() => {
     if (!load?.carrier_id || !selectedCompanyId) {
@@ -312,12 +327,7 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
                 {load.reference_id && (
                   <code className="text-[11px] text-muted-foreground">#{load.reference_id}</code>
                 )}
-                {isTrackable && (
-                  <Badge variant={isConnected ? "success" : "outline"} className="gap-1">
-                    <Radio size={10} className={isConnected ? "animate-pulse" : ""} />
-                    {isConnected ? "Live" : t("load_detail_ws_offline")}
-                  </Badge>
-                )}
+                {isTrackable && <ConnectionStatusBadge status={connectionStatus} />}
               </div>
             </div>
           </div>
@@ -601,6 +611,15 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
                 </p>
               </div>
             </section>
+
+            <hr className="border-border" />
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("load_detail_history")}
+              </h2>
+              <LoadHistoryTimeline history={load.history ?? []} />
+            </section>
           </div>
         </div>
       </div>
@@ -633,84 +652,15 @@ export function LoadDetailView({ loadId, isModal, onClose }: LoadDetailViewProps
             </TabsList>
 
             <TabsContent value="existing" className="space-y-3">
-              {carriersLoading ? (
-                <div className="flex justify-center py-6">
-                  <Spinner size={20} />
-                </div>
-              ) : carriers.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  {t("load_detail_no_carriers")}{" "}
-                  <button
-                    type="button"
-                    className="text-primary hover:underline"
-                    onClick={() => { setAssignOpen(false); navigate("/carriers"); }}
-                  >
-                    {t("load_detail_add_carrier_link")}
-                  </button>
-                </p>
-              ) : (() => {
-                const q = assignCarrierSearch.toLowerCase();
-                const filtered = q
-                  ? carriers.filter((c) => {
-                      const name = `${c.first_name} ${c.last_name}`.toLowerCase();
-                      return name.includes(q) || c.alias?.toLowerCase().includes(q);
-                    })
-                  : carriers;
-                return (
-                  <>
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder={t("load_detail_carrier_search_placeholder")}
-                        value={assignCarrierSearch}
-                        onChange={(e) => setAssignCarrierSearch(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                    <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border p-1">
-                      {filtered.length === 0 ? (
-                        <p className="py-4 text-center text-xs text-muted-foreground">
-                          {t("load_detail_carrier_no_results")}
-                        </p>
-                      ) : (
-                        filtered.map((carrier) => (
-                          <button
-                            key={carrier.carrier_id}
-                            type="button"
-                            onClick={() => setSelectedCarrierId(carrier.carrier_id)}
-                            className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
-                              selectedCarrierId === carrier.carrier_id
-                                ? "bg-primary/10 text-primary"
-                                : "hover:bg-muted"
-                            }`}
-                          >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                              {carrier.first_name?.[0]}
-                              {carrier.last_name?.[0]}
-                            </div>
-                            <div>
-                              <p className="font-medium">
-                                {carrier.alias || `${carrier.first_name} ${carrier.last_name}`.trim()}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <p className="text-xs text-muted-foreground">
-                                  {carrier.first_name} {carrier.last_name}
-                                </p>
-                                <Badge
-                                  variant={carrier.is_free ? "success" : "secondary"}
-                                  className="px-1.5 py-0 text-[10px]"
-                                >
-                                  {carrier.is_free ? t("carriers_status_available") : t("carriers_status_busy")}
-                                </Badge>
-                              </div>
-                            </div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
+              <CarrierPicker
+                carriers={carriers}
+                loading={carriersLoading}
+                searchValue={assignCarrierSearch}
+                onSearchChange={setAssignCarrierSearch}
+                selectedCarrierId={selectedCarrierId}
+                onSelect={setSelectedCarrierId}
+                onAddCarrier={() => { setAssignOpen(false); navigate("/carriers"); }}
+              />
             </TabsContent>
 
             <TabsContent value="invite">

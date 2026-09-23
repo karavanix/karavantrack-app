@@ -215,6 +215,26 @@ export type LoadStatus =
   | "confirmed"
   | "cancelled";
 
+export interface LoadHistoryAttachment {
+  id: number;
+  history_id: number;
+  attachment_id: string;
+  // Best-effort: absent if the server could not resolve a URL for this
+  // attachment (deleted from storage, presign failure, etc.).
+  url?: string;
+  created_at: string;
+}
+
+export interface LoadHistoryEntry {
+  id: number;
+  user_id?: string;
+  from_status: LoadStatus | "";
+  to_status: LoadStatus;
+  note?: string;
+  created_at: string;
+  attachments: LoadHistoryAttachment[];
+}
+
 export interface Load {
   id: string;
   title: string;
@@ -234,6 +254,9 @@ export interface Load {
   dropoff_at: string;
   created_at: string;
   updated_at: string;
+  // Present on GET /loads/{id} and the driver's active-load endpoint; absent
+  // from list responses (LoadResponse without history).
+  history?: LoadHistoryEntry[];
 }
 
 export interface CreateLoadRequest {
@@ -315,6 +338,18 @@ export interface PublicTrackingLoad {
 export interface PublicTrackingResponse {
   load: PublicTrackingLoad;
   position: Position | null;
+  connection?: ConnectionStatus;
+}
+
+// ──── Connection status ────
+// Whether the driver's phone is actually reachable and streaming GPS for a
+// load — as opposed to whether *this browser* has a WebSocket open.
+export type ConnectionState = "not_started" | "live" | "economy" | "disconnected" | "gps_disabled";
+
+export interface ConnectionStatus {
+  state: ConnectionState;
+  reason?: string;
+  last_point_at?: string;
 }
 
 // ──── Tracking ────
