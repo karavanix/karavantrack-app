@@ -19,8 +19,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CopyLinkPanel } from "@/components/shared/copy-link-panel";
 import { CarrierPicker } from "@/components/loads/carrier-picker";
 import { MapPin, AlertCircle, Navigation, CheckCircle2 } from "lucide-react";
-import type { Carrier, CreateLoadResponse, InviteLinkResponse, PaginatedResponse } from "@/types";
+import type { Carrier, CreateLoadResponse, InviteLinkResponse, PaginatedResponse, RoutePreview } from "@/types";
 import { localToUtc } from "@/lib/date-utils";
+import { decodePolyline } from "@/lib/polyline";
+import { formatDistance, formatDuration } from "@/lib/format";
+import { haversineKm } from "@/lib/geo";
 import MapLibrePickupMap, { type LatLng } from "@/components/map/MapLibrePickupMap";
 
 interface CreateLoadModalProps {
@@ -29,8 +32,35 @@ interface CreateLoadModalProps {
   onSuccess: () => void;
 }
 
+type RoutePreviewState = {
+  /** The pickup → dropoff pair this preview was built for. */
+  key: string;
+  coordinates: [number, number][];
+  distance_m: number;
+  duration_s: number;
+};
+
+const routeKey = (from: LatLng, to: LatLng) => `${from.lat},${from.lng};${to.lat},${to.lng}`;
+
+/**
+ * The routing engine snaps each point to the nearest road it knows. Outside
+ * its map (e.g. across the border) that road can be km away, and the "route"
+ * never reaches the points; such a route counts as none.
+ */
+const MAX_SNAP_KM = 1;
+
+function reachesPoints(coords: [number, number][], from: LatLng, to: LatLng) {
+  if (coords.length < 2) return false;
+  const [startLng, startLat] = coords[0];
+  const [endLng, endLat] = coords[coords.length - 1];
+  return (
+    haversineKm(startLat, startLng, from.lat, from.lng) <= MAX_SNAP_KM &&
+    haversineKm(endLat, endLng, to.lat, to.lng) <= MAX_SNAP_KM
+  );
+}
+
 export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { selectedCompanyId } = useCompanyStore();
 
   const [step, setStep] = useState<"details" | "assign">("details");
@@ -63,6 +93,41 @@ export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadMod
   const [assignError, setAssignError] = useState("");
 
   const [center, setCenter] = useState<LatLng>({ lat: 41.3111, lng: 69.2797 });
+  const [routePreview, setRoutePreview] = useState<RoutePreviewState | null>(null);
+
+  // ── Driving route preview between the two points ──
+  // Any failure (no road between them: 422, routing down: 503, a route that
+  // doesn't reach the points) silently leaves the straight line. A preview only counts for the pair it was
+  // built for, so moving a point never shows the old route.
+  useEffect(() => {
+    if (!pickup || !dropoff) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get<RoutePreview>("/routes/preview", {
+          params: { from: `${pickup.lat},${pickup.lng}`, to: `${dropoff.lat},${dropoff.lng}` },
+          signal: controller.signal,
+        });
+        const coordinates = decodePolyline(data.geometry);
+        if (!reachesPoints(coordinates, pickup, dropoff)) return;
+        setRoutePreview({
+          key: routeKey(pickup, dropoff),
+          coordinates,
+          distance_m: data.distance_m,
+          duration_s: data.duration_s,
+        });
+      } catch {
+        // Straight line stays
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [pickup, dropoff]);
+
+  const preview =
+    pickup && dropoff && routePreview?.key === routeKey(pickup, dropoff) ? routePreview : null;
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -217,6 +282,7 @@ export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadMod
                 flyTarget={flyTarget}
                 onPickup={handleMapPickup}
                 onDropoff={handleMapDropoff}
+                routeCoordinates={preview?.coordinates}
                 className="h-full w-full"
               />
               {/* Mode selector overlay */}
@@ -248,6 +314,17 @@ export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadMod
                   {dropoff && " ✓"}
                 </button>
               </div>
+              {/* Route estimate */}
+              {preview && (
+                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
+                  <span className="whitespace-nowrap rounded-lg bg-white/90 px-3 py-1.5 text-xs font-semibold tabular-nums text-gray-800 shadow-lg backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-100">
+                    {t("route_preview_estimate", {
+                      distance: formatDistance(preview.distance_m, i18n.language, t),
+                      duration: formatDuration(preview.duration_s / 60, t),
+                    })}
+                  </span>
+                </div>
+              )}
               {/* Hint overlay */}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
                 <span className="rounded-lg bg-black/60 px-3 py-1.5 text-[11px] text-white/90 backdrop-blur-sm">
