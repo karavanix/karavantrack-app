@@ -31,7 +31,7 @@ type Props = {
   dropoff: LatLng | null;
   carrierPosition: LatLng | null;
   carrierHeading?: number | null;
-  /** Raw track points, oldest first (useLoadTrack flips /track's order). */
+  /** Raw track points, oldest first. */
   trackPoints: MapTrackPoint[];
   /** The track matched to roads; null until matched or with matching off. */
   route?: LoadRoute | null;

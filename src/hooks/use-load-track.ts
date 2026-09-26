@@ -31,30 +31,34 @@ export function useLoadTrack({ basePath, live }: UseLoadTrackOptions) {
     if (!basePath) return;
     let cancelled = false;
     let loadedOnce = false;
+    /** How many points of the server's list have been read so far. */
+    let read = 0;
     let newestAt = -Infinity;
     let pulling = false;
 
-    // /track returns points newest first. Read pages from the newest end
-    // until reaching a point already shown (on the first pull: everything),
-    // then flip them to oldest first. The first pull replaces whatever was
-    // shown for a previous basePath.
+    // /track returns points oldest first, so new ones land at the end: read
+    // on from where the last pull stopped. A late point from the phone's
+    // offline queue lands earlier (by its recorded_at) and shifts the list,
+    // so keep only points newer than the newest shown. The first pull
+    // replaces whatever was shown for a previous basePath.
     const pullTrack = async () => {
       if (pulling) return;
       pulling = true;
       try {
         const fresh: TrackPoint[] = [];
         const pageSize = loadedOnce ? TRACK_UPDATE_PAGE_SIZE : TRACK_PAGE_SIZE;
-        for (let offset = 0; ; offset += pageSize) {
+        let offset = read;
+        for (;;) {
           const { data } = await api.get<TrackResponse>(
             `${basePath}/track?limit=${pageSize}&offset=${offset}`
           );
           const points = data?.points ?? [];
-          const known = points.findIndex((p) => new Date(p.recorded_at).getTime() <= newestAt);
-          fresh.push(...(known === -1 ? points : points.slice(0, known)));
-          if (known !== -1 || points.length < pageSize) break;
+          offset += points.length;
+          fresh.push(...points.filter((p) => new Date(p.recorded_at).getTime() > newestAt));
+          if (points.length < pageSize) break;
         }
         if (cancelled) return;
-        fresh.reverse();
+        read = offset;
         if (fresh.length > 0) newestAt = new Date(fresh[fresh.length - 1].recorded_at).getTime();
         if (!loadedOnce) setTrackPoints(fresh);
         else if (fresh.length > 0) setTrackPoints((prev) => prev.concat(fresh));
