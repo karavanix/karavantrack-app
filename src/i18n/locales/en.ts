@@ -353,6 +353,27 @@ const en = {
   tracking_page_last_update: "Last update",
   tracking_page_not_trackable: "Live tracking isn't available for this load yet.",
 
+  // Map: track, route, legend
+  map_legend: "Legend",
+  map_legend_show: "Show map legend",
+  map_legend_hide: "Close legend",
+  map_legend_pickup: "Pickup",
+  map_legend_dropoff: "Dropoff",
+  map_legend_carrier: "Carrier",
+  map_legend_planned: "Pickup → dropoff",
+  map_legend_track: "Track",
+  map_legend_raw: "Not matched to roads",
+  map_legend_gap: "No data",
+  map_legend_stop: "Stop",
+  map_gap_label: "no data {{duration}}",
+  map_stop_tooltip: "Stop {{duration}}",
+  route_distance_driven: "Distance driven",
+  route_preview_estimate: "≈ {{distance}} · ~{{duration}}",
+  duration_minutes: "{{m}} min",
+  duration_hours: "{{h}} h",
+  duration_hours_minutes: "{{h}} h {{m}} min",
+  distance_km: "{{value}} km",
+
   // Common
   common_cancel: "Cancel",
   common_save: "Save",

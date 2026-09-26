@@ -1,29 +1,40 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import maplibregl, { LngLatBounds } from "maplibre-gl";
+import { useTranslation } from "react-i18next";
+import maplibregl, { LngLatBounds, type MapLayerMouseEvent } from "maplibre-gl";
 import { useMapLibre, type LatLng } from "@/hooks/use-maplibre";
 import { createMapMarker, updateMarkerHeading } from "@/components/map/map-markers";
 import { MapOverlay } from "@/components/map/MapOverlay";
 import { MapLegend } from "@/components/map/MapLegend";
+import {
+  STOPS_LAYER,
+  buildRouteOverlay,
+  buildTail,
+  ensureTrackOverlay,
+  setTrackOverlayData,
+  setTrackTailData,
+  type TrackPointProps,
+} from "@/components/map/track-overlay";
+import { formatDuration } from "@/lib/format";
+import type { LoadRoute, TrackPoint } from "@/types";
 
 export type { LatLng };
 
 const PLANNED_ROUTE_SOURCE_ID = "planned-route-source";
 const PLANNED_ROUTE_LAYER_ID = "planned-route-layer";
 
-const TRACK_SOURCE_ID = "track-source";
-const TRACK_LAYER_ID = "track-layer";
+type MapTrackPoint = Pick<TrackPoint, "lat" | "lng" | "recorded_at">;
 
-type TrackPoint = {
-  lat: number;
-  lng: number;
-};
+const NO_POINTS: MapTrackPoint[] = [];
 
 type Props = {
   pickup: LatLng | null;
   dropoff: LatLng | null;
   carrierPosition: LatLng | null;
   carrierHeading?: number | null;
-  trackPoints: TrackPoint[];
+  /** Raw track points, oldest first (useLoadTrack flips /track's order). */
+  trackPoints: MapTrackPoint[];
+  /** The track matched to roads; null until matched or with matching off. */
+  route?: LoadRoute | null;
   className?: string;
   /** If true, the follow-carrier toggle is shown and starts enabled */
   trackable?: boolean;
@@ -60,9 +71,11 @@ export default function MapLibreTrackingMap({
   carrierPosition,
   carrierHeading,
   trackPoints,
+  route = null,
   className,
   trackable = false,
 }: Props) {
+  const { t, i18n } = useTranslation();
   const [following, setFollowing] = useState(true);
 
   const pickupMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -115,38 +128,18 @@ export default function MapLibreTrackingMap({
           "line-cap": "round",
           "line-join": "round",
         },
+        // Fine dots, so the straight pickup → dropoff line isn't mistaken
+        // for a dashed gap in the track.
         paint: {
-          "line-color": "#64748b",
-          "line-width": 2,
-          "line-opacity": 0.45,
-          "line-dasharray": [4, 4],
+          "line-color": ["case", ["==", ["global-state", "theme"], "dark"], "#94a3b8", "#64748b"],
+          "line-width": 2.5,
+          "line-opacity": 0.6,
+          "line-dasharray": [0, 2],
         },
       });
     }
 
-    if (!map.getSource(TRACK_SOURCE_ID)) {
-      map.addSource(TRACK_SOURCE_ID, {
-        type: "geojson",
-        data: emptyFeatureCollection(),
-      });
-    }
-
-    if (!map.getLayer(TRACK_LAYER_ID)) {
-      map.addLayer({
-        id: TRACK_LAYER_ID,
-        type: "line",
-        source: TRACK_SOURCE_ID,
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-        },
-        paint: {
-          "line-color": "#3b82f6",
-          "line-width": 3,
-          "line-opacity": 0.85,
-        },
-      });
-    }
+    ensureTrackOverlay(map);
   }, []);
 
   const { containerRef, mapRef, isReady, error } = useMapLibre({
@@ -256,20 +249,76 @@ export default function MapLibreTrackingMap({
     }
   }, [pickup, dropoff, isReady, mapRef]);
 
-  // ── Actual track line ──
+  // ── Track: the matched route, or the raw points while there's none ──
+  // With a route the raw points only feed the live tail, so new points
+  // don't re-decode the whole route.
+  const fallbackPoints = route ? NO_POINTS : trackPoints;
+  const overlay = useMemo(
+    () => buildRouteOverlay(route, fallbackPoints, (minutes) =>
+      t("map_gap_label", { duration: formatDuration(minutes, t) })
+    ),
+    [route, fallbackPoints, t]
+  );
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady) return;
+    setTrackOverlayData(map, overlay);
+  }, [overlay, isReady, mapRef]);
+
+  // ── Live tail: end of the drawn track → unmatched points → carrier ──
+  const carrierLat = carrierPosition?.lat;
+  const carrierLng = carrierPosition?.lng;
+  const tail = useMemo(
+    () => buildTail(
+      overlay,
+      trackPoints,
+      carrierLat != null && carrierLng != null ? { lat: carrierLat, lng: carrierLng } : null
+    ),
+    [overlay, trackPoints, carrierLat, carrierLng]
+  );
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady) return;
+    setTrackTailData(map, tail);
+  }, [tail, isReady, mapRef]);
+
+  // ── Stop tooltips: on hover, or on tap for touch screens ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isReady) return;
 
-    const source = map.getSource(TRACK_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
-    if (!source) return;
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
+    const show = (e: MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      if (!feature || feature.geometry.type !== "Point") return;
+      const props = feature.properties as TrackPointProps;
+      if (props.kind !== "stop") return;
+      const hhmm = (at: string) =>
+        new Date(at).toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit" });
+      const range = `${hhmm(props.started_at)}–${hhmm(props.ended_at)}`;
+      popup
+        .setLngLat(feature.geometry.coordinates as [number, number])
+        .setText(`${t("map_stop_tooltip", { duration: formatDuration(props.minutes, t) })} · ${range}`)
+        .addTo(map);
+      map.getCanvas().style.cursor = "pointer";
+    };
+    const hide = () => {
+      popup.remove();
+      map.getCanvas().style.cursor = "";
+    };
 
-    if (trackPoints.length > 1) {
-      source.setData(getLineFeature(trackPoints));
-    } else {
-      source.setData(emptyFeatureCollection());
-    }
-  }, [trackPoints, isReady, mapRef]);
+    map.on("mouseenter", STOPS_LAYER, show);
+    map.on("click", STOPS_LAYER, show);
+    map.on("mouseleave", STOPS_LAYER, hide);
+    return () => {
+      map.off("mouseenter", STOPS_LAYER, show);
+      map.off("click", STOPS_LAYER, show);
+      map.off("mouseleave", STOPS_LAYER, hide);
+      popup.remove();
+    };
+  }, [isReady, mapRef, t, i18n.language]);
 
   // ── Initial bounds fit (runs once when map becomes ready) ──
   useEffect(() => {
@@ -355,7 +404,7 @@ export default function MapLibreTrackingMap({
     <div className="relative h-full w-full">
       <div ref={containerRef} className={className ?? "h-full w-full"} />
       <MapOverlay isReady={isReady} error={error} />
-      <MapLegend />
+      <MapLegend hasRoute={route != null} />
 
       {showFollowButton && (
         <button

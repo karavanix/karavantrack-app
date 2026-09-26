@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
+import { useLoadTrack } from "@/hooks/use-load-track";
 import { useConnectionStatus } from "@/hooks/use-connection-status";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -50,30 +51,19 @@ import {
   Timer,
   ExternalLink,
   Share2,
+  Route,
 } from "lucide-react";
 import type {
   Load,
   Carrier,
   Position,
-  TrackPoint,
-  TrackResponse,
   PaginatedResponse,
   InviteLinkResponse,
   TrackingLinkResponse,
 } from "@/types";
 import { utcToLocalDisplay, utcToLocalTimeDisplay } from "@/lib/date-utils";
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { formatDistance } from "@/lib/format";
+import { haversineKm } from "@/lib/geo";
 
 interface LoadDetailViewProps {
   loadId: string;
@@ -84,12 +74,11 @@ interface LoadDetailViewProps {
 
 export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: LoadDetailViewProps) {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { selectedCompanyId } = useCompanyStore();
 
   const [load, setLoad] = useState<Load | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
-  const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -125,6 +114,12 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
     enabled: !!isTrackable,
   });
 
+  // Wait for the load, so the hook starts once, already knowing if it's live.
+  const { trackPoints, route } = useLoadTrack({
+    basePath: load ? `/loads/${loadId}` : null,
+    live: isTrackable,
+  });
+
   const fetchLoad = useCallback(async () => {
     if (!loadId) return;
     setIsLoading(true);
@@ -142,26 +137,6 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
         }
       } else {
         setPosition(null);
-      }
-
-      try {
-        const PAGE_SIZE = 1000;
-        let offset = 0;
-        let allPoints: TrackPoint[] = [];
-        let total = Infinity;
-        while (allPoints.length < total) {
-          const trackRes = await api.get<TrackResponse>(
-            `/loads/${loadId}/track?limit=${PAGE_SIZE}&offset=${offset}`
-          );
-          const { points = [], total: t } = trackRes.data ?? {};
-          total = t ?? 0;
-          allPoints = allPoints.concat(points);
-          offset += points.length;
-          if (points.length < PAGE_SIZE) break;
-        }
-        setTrackPoints(allPoints);
-      } catch {
-        setTrackPoints([]);
       }
     } catch (err) {
       setError(getApiErrorMessage(err));
@@ -417,7 +392,8 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
             dropoff={dropoff}
             carrierPosition={carrierPosition}
             carrierHeading={position?.heading_deg}
-            trackPoints={trackPoints.map((p) => ({ lat: p.lat, lng: p.lng }))}
+            trackPoints={trackPoints}
+            route={route}
             trackable={isTrackable}
           />
           <div className="absolute top-3 right-3 z-20">
@@ -476,6 +452,21 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                 </p>
               )}
             </section>
+
+            {route && (
+              <>
+                <hr className="border-border" />
+                <section className="space-y-1.5">
+                  <h2 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <Route size={12} />
+                    {t("route_distance_driven")}
+                  </h2>
+                  <p className="text-sm font-medium tabular-nums">
+                    {formatDistance(route.distance_m, i18n.language, t)}
+                  </p>
+                </section>
+              </>
+            )}
 
             <hr className="border-border" />
 

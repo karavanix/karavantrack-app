@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
-import { AlertTriangle, Calendar, Clock, MapPin, Navigation, Truck, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, MapPin, Navigation, Route, Truck, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
 import { ConnectionStatusBadge } from "@/components/loads/connection-status-badge";
 import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
 import { utcToLocalDisplay } from "@/lib/date-utils";
-import type { PublicTrackingResponse, TrackPoint, TrackResponse } from "@/types";
+import { formatDistance } from "@/lib/format";
+import { useLoadTrack } from "@/hooks/use-load-track";
+import type { PublicTrackingResponse } from "@/types";
 
 const POLL_MS = 5000;
-const TRACK_PAGE_SIZE = 1000;
 
 const TRACKABLE_STATUSES = [
   "assigned",
@@ -28,64 +29,37 @@ type ViewState = "loading" | "invalid" | "error" | "loaded";
 
 export default function PublicTrackingPage() {
   const { token } = useParams<{ token: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [state, setState] = useState<ViewState>(token ? "loading" : "invalid");
   const [data, setData] = useState<PublicTrackingResponse | null>(null);
-  const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
 
-  // Tracks how many points we've already fetched, so polling only pulls new ones.
-  const trackPointsCountRef = useRef(0);
-
-  const fetchTrackPage = useCallback(
-    async (offset: number): Promise<TrackPoint[]> => {
-      if (!token) return [];
-      let allPoints: TrackPoint[] = [];
-      let cursor = offset;
-      // Paginate until we've consumed everything currently available.
-      for (;;) {
-        const { data } = await api.get<TrackResponse>(
-          `/public/tracking/${token}/track?limit=${TRACK_PAGE_SIZE}&offset=${cursor}`
-        );
-        const points = data?.points ?? [];
-        allPoints = allPoints.concat(points);
-        cursor += points.length;
-        if (points.length < TRACK_PAGE_SIZE) break;
-      }
-      return allPoints;
-    },
-    [token]
-  );
-
-  const fetchInitial = useCallback(async () => {
-    if (!token) return;
-    try {
-      const { data: trackingData } = await api.get<PublicTrackingResponse>(
-        `/public/tracking/${token}`
-      );
-      setData(trackingData);
-
-      try {
-        const points = await fetchTrackPage(0);
-        trackPointsCountRef.current = points.length;
-        setTrackPoints(points);
-      } catch {
-        setTrackPoints([]);
-      }
-
-      setState("loaded");
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 404) {
-        setState("invalid");
-      } else {
-        setState("error");
-      }
-    }
-  }, [token, fetchTrackPage]);
+  const isTrackable = data != null && TRACKABLE_STATUSES.includes(data.load.status);
+  const { trackPoints, route } = useLoadTrack({
+    basePath: token && data ? `/public/tracking/${token}` : null,
+    live: isTrackable,
+  });
 
   useEffect(() => {
-    fetchInitial();
-  }, [fetchInitial]);
+    if (!token) return;
+    let cancelled = false;
+    api
+      .get<PublicTrackingResponse>(`/public/tracking/${token}`)
+      .then(({ data: trackingData }) => {
+        if (cancelled) return;
+        setData(trackingData);
+        setState("loaded");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          setState("invalid");
+        } else {
+          setState("error");
+        }
+      });
+    return () => { cancelled = true; };
+  }, [token]);
 
   // ── Poll for fresh position + status every 5s ──
   useEffect(() => {
@@ -97,23 +71,13 @@ export default function PublicTrackingPage() {
           `/public/tracking/${token}`
         );
         setData(trackingData);
-
-        try {
-          const newPoints = await fetchTrackPage(trackPointsCountRef.current);
-          if (newPoints.length > 0) {
-            trackPointsCountRef.current += newPoints.length;
-            setTrackPoints((prev) => prev.concat(newPoints));
-          }
-        } catch {
-          // Keep showing the last known track on transient errors
-        }
       } catch {
         // Keep showing the last known state on transient poll errors
       }
     }, POLL_MS);
 
     return () => clearInterval(interval);
-  }, [token, state, fetchTrackPage]);
+  }, [token, state]);
 
   if (state === "loading") {
     return (
@@ -149,7 +113,6 @@ export default function PublicTrackingPage() {
   }
 
   const { load, position } = data;
-  const isTrackable = TRACKABLE_STATUSES.includes(load.status);
 
   const pickup =
     load.pickup?.lat != null && load.pickup?.lng != null
@@ -193,7 +156,8 @@ export default function PublicTrackingPage() {
             dropoff={dropoff}
             carrierPosition={carrierPosition}
             carrierHeading={position?.heading_deg}
-            trackPoints={trackPoints.map((p) => ({ lat: p.lat, lng: p.lng }))}
+            trackPoints={trackPoints}
+            route={route}
             trackable={isTrackable}
           />
         </div>
@@ -233,6 +197,21 @@ export default function PublicTrackingPage() {
                 </p>
               )}
             </section>
+
+            {route && (
+              <>
+                <hr className="border-border" />
+                <section className="space-y-1.5">
+                  <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <Route size={12} />
+                    {t("route_distance_driven")}
+                  </h2>
+                  <p className="text-sm font-medium tabular-nums">
+                    {formatDistance(route.distance_m, i18n.language, t)}
+                  </p>
+                </section>
+              </>
+            )}
 
             {isTrackable && position?.recorded_at && (
               <>
