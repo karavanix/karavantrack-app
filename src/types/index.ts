@@ -379,6 +379,40 @@ export interface TrackResponse {
   total: number;
 }
 
+/**
+ * matched — along roads; raw — the matcher couldn't place it, drawn as
+ * recorded; gap — no data (straight line); stop — a single point.
+ */
+export type RouteSegmentKind = "matched" | "raw" | "gap" | "stop";
+
+export interface RouteSegment {
+  kind: RouteSegmentKind;
+  started_at: string;
+  ended_at: string;
+  /** polyline6 */
+  geometry: string;
+  distance_m: number;
+}
+
+/** GET /loads/{id}/route — 404 until the first match or when matching is off. */
+export interface LoadRoute {
+  load_id: string;
+  /** Distance driven along roads; gaps aren't counted. */
+  distance_m: number;
+  /** Points recorded after this aren't in the route yet (the live tail). */
+  matched_until?: string;
+  updated_at: string;
+  segments: RouteSegment[];
+}
+
+/** GET /routes/preview */
+export interface RoutePreview {
+  /** polyline6 */
+  geometry: string;
+  distance_m: number;
+  duration_s: number;
+}
+
 // ──── Pagination ────
 export interface PaginationParams {
   limit?: number;

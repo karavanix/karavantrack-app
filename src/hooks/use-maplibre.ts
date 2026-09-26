@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import maplibregl, { type LayerSpecification, type StyleSpecification } from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useThemeStore } from "@/stores/theme-store";
@@ -18,6 +18,43 @@ function ensureProtocol() {
 
 export function getStyleUrl(theme: string) {
   return theme === "dark" ? STYLE_URL_DARK : STYLE_URL_LIGHT;
+}
+
+/**
+ * setStyle swaps the whole style, which drops the sources and layers added at
+ * runtime (tracks, routes) along with their data. Carry them over into the
+ * next style at the same place in the layer order. Also sets the "theme"
+ * global state that runtime layers use to pick their colors.
+ */
+function carryOverRuntimeLayers(
+  prev: StyleSpecification | undefined,
+  next: StyleSpecification,
+  theme: string
+): StyleSpecification {
+  const state = { ...next.state, theme: { default: theme } };
+  if (!prev) return { ...next, state };
+
+  const sources = { ...next.sources };
+  const runtimeSources = new Set<string>();
+  for (const [id, source] of Object.entries(prev.sources)) {
+    if (id in sources) continue;
+    sources[id] = source;
+    runtimeSources.add(id);
+  }
+
+  const isRuntime = (layer: LayerSpecification) =>
+    "source" in layer && typeof layer.source === "string" && runtimeSources.has(layer.source);
+  const nextIds = new Set(next.layers.map((l) => l.id));
+  const layers = [...next.layers];
+  prev.layers.forEach((layer, i) => {
+    if (!isRuntime(layer)) return;
+    // Insert before the first basemap layer that followed it before.
+    const anchor = prev.layers.slice(i + 1).find((l) => nextIds.has(l.id));
+    const at = anchor ? layers.findIndex((l) => l.id === anchor.id) : layers.length;
+    layers.splice(at, 0, layer);
+  });
+
+  return { ...next, sources, layers, state };
 }
 
 export type LatLng = {
@@ -58,6 +95,7 @@ export function useMapLibre(opts: UseMapLibreOptions = {}) {
 
   // Stable ref for initial values so the init effect has no deps
   const initRef = useRef({ center, zoom, theme });
+  const appliedThemeRef = useRef(theme);
 
   useEffect(() => {
     ensureProtocol();
@@ -80,6 +118,7 @@ export function useMapLibre(opts: UseMapLibreOptions = {}) {
     map.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.on("load", () => {
+      map.setGlobalStateProperty("theme", appliedThemeRef.current);
       onStyleReadyRef.current?.(map);
       setIsReady(true);
       setError(null);
@@ -106,11 +145,15 @@ export function useMapLibre(opts: UseMapLibreOptions = {}) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Theme switching
+  // Theme switching. The map was created with the initial theme's style, so
+  // only a real change swaps it.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    map.setStyle(getStyleUrl(theme));
+    if (!map || appliedThemeRef.current === theme) return;
+    appliedThemeRef.current = theme;
+    map.setStyle(getStyleUrl(theme), {
+      transformStyle: (prev, next) => carryOverRuntimeLayers(prev, next, theme),
+    });
   }, [theme]);
 
   return { containerRef, mapRef, isReady, error };

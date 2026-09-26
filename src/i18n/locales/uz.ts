@@ -333,6 +333,27 @@ const uz = {
   tracking_page_last_update: "Oxirgi yangilanish",
   tracking_page_not_trackable: "Bu yuk uchun real vaqt kuzatuvi hali mavjud emas.",
 
+  // Map: track, route, legend
+  map_legend: "Shartli belgilar",
+  map_legend_show: "Xarita belgilarini ko'rsatish",
+  map_legend_hide: "Belgilarni yopish",
+  map_legend_pickup: "Yuklash",
+  map_legend_dropoff: "Tushirish",
+  map_legend_carrier: "Tashuvchi",
+  map_legend_planned: "Yuklash → tushirish",
+  map_legend_track: "Yo'l",
+  map_legend_raw: "Yo'lga bog'lanmagan",
+  map_legend_gap: "Ma'lumot yo'q",
+  map_legend_stop: "To'xtash",
+  map_gap_label: "ma'lumot yo'q {{duration}}",
+  map_stop_tooltip: "To'xtash {{duration}}",
+  route_distance_driven: "Yo'l bo'yicha masofa",
+  route_preview_estimate: "≈ {{distance}} · ~{{duration}}",
+  duration_minutes: "{{m}} daq",
+  duration_hours: "{{h}} soat",
+  duration_hours_minutes: "{{h}} soat {{m}} daq",
+  distance_km: "{{value}} km",
+
   // Common
   common_cancel: "Bekor qilish",
   common_save: "Saqlash",

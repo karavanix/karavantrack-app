@@ -8,6 +8,7 @@ export type { LatLng };
 
 const ROUTE_SOURCE_ID = "route-source";
 const ROUTE_LAYER_ID = "route-layer";
+const STRAIGHT_LAYER_ID = "route-straight-layer";
 
 type Props = {
   center?: LatLng;
@@ -17,23 +18,22 @@ type Props = {
   flyTarget: LatLng | null;
   onPickup: (point: LatLng) => void;
   onDropoff: (point: LatLng) => void;
+  /**
+   * The driving route between pickup and dropoff as [lng, lat] pairs. Without
+   * it (loading, or no route found) a straight dotted line is drawn instead.
+   */
+  routeCoordinates?: [number, number][] | null;
   className?: string;
 };
 
-function getRouteGeoJSON(pickup: LatLng, dropoff: LatLng) {
+function getRouteGeoJSON(coordinates: [number, number][], straight: boolean) {
   return {
     type: "FeatureCollection" as const,
     features: [
       {
         type: "Feature" as const,
-        properties: {},
-        geometry: {
-          type: "LineString" as const,
-          coordinates: [
-            [pickup.lng, pickup.lat],
-            [dropoff.lng, dropoff.lat],
-          ],
-        },
+        properties: { straight },
+        geometry: { type: "LineString" as const, coordinates },
       },
     ],
   };
@@ -47,6 +47,7 @@ export default function MapLibrePickupMap({
   flyTarget,
   onPickup,
   onDropoff,
+  routeCoordinates = null,
   className,
 }: Props) {
   const pickupMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -68,11 +69,32 @@ export default function MapLibrePickupMap({
       });
     }
 
+    // Straight pickup → dropoff: fine dots, same as on the load map.
+    if (!map.getLayer(STRAIGHT_LAYER_ID)) {
+      map.addLayer({
+        id: STRAIGHT_LAYER_ID,
+        type: "line",
+        source: ROUTE_SOURCE_ID,
+        filter: ["==", ["get", "straight"], true],
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": ["case", ["==", ["global-state", "theme"], "dark"], "#94a3b8", "#64748b"],
+          "line-width": 3,
+          "line-opacity": 0.8,
+          "line-dasharray": [0, 2],
+        },
+      });
+    }
+
     if (!map.getLayer(ROUTE_LAYER_ID)) {
       map.addLayer({
         id: ROUTE_LAYER_ID,
         type: "line",
         source: ROUTE_SOURCE_ID,
+        filter: ["==", ["get", "straight"], false],
         layout: {
           "line-cap": "round",
           "line-join": "round",
@@ -155,14 +177,14 @@ export default function MapLibrePickupMap({
     if (!source) return;
 
     if (pickup && dropoff) {
-      source.setData(getRouteGeoJSON(pickup, dropoff));
-
-      const bounds = new LngLatBounds(
+      const coordinates = routeCoordinates ?? [
         [pickup.lng, pickup.lat],
-        [pickup.lng, pickup.lat]
-      );
+        [dropoff.lng, dropoff.lat],
+      ];
+      source.setData(getRouteGeoJSON(coordinates, !routeCoordinates));
 
-      bounds.extend([dropoff.lng, dropoff.lat]);
+      const bounds = new LngLatBounds(coordinates[0], coordinates[0]);
+      for (const c of coordinates) bounds.extend(c);
 
       map.fitBounds(bounds, {
         padding: 60,
@@ -175,7 +197,7 @@ export default function MapLibrePickupMap({
         features: [],
       });
     }
-  }, [pickup, dropoff, mapRef]);
+  }, [pickup, dropoff, routeCoordinates, mapRef]);
 
   // ── Fly to target ──
   useEffect(() => {

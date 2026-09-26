@@ -353,6 +353,27 @@ const ru = {
   tracking_page_last_update: "Последнее обновление",
   tracking_page_not_trackable: "Отслеживание в реальном времени пока недоступно для этого груза.",
 
+  // Map: track, route, legend
+  map_legend: "Легенда",
+  map_legend_show: "Показать легенду карты",
+  map_legend_hide: "Закрыть легенду",
+  map_legend_pickup: "Погрузка",
+  map_legend_dropoff: "Разгрузка",
+  map_legend_carrier: "Перевозчик",
+  map_legend_planned: "Погрузка → разгрузка",
+  map_legend_track: "Трек",
+  map_legend_raw: "Не привязано к дорогам",
+  map_legend_gap: "Нет данных",
+  map_legend_stop: "Стоянка",
+  map_gap_label: "нет данных {{duration}}",
+  map_stop_tooltip: "Стоянка {{duration}}",
+  route_distance_driven: "Пробег по дорогам",
+  route_preview_estimate: "≈ {{distance}} · ~{{duration}}",
+  duration_minutes: "{{m}} мин",
+  duration_hours: "{{h}} ч",
+  duration_hours_minutes: "{{h}} ч {{m}} мин",
+  distance_km: "{{value}} км",
+
   // Common
   common_cancel: "Отмена",
   common_save: "Сохранить",
