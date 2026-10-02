@@ -12,6 +12,7 @@ import LoadDetailPage from "@/pages/load-detail";
 import ProfilePage from "@/pages/profile";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsOfServicePage from "@/pages/terms-of-service";
+import DeleteAccountPage from "@/pages/delete-account";
 import InvitePage from "@/pages/invite";
 import PublicTrackingPage from "@/pages/public-tracking";
 
@@ -25,6 +26,7 @@ export function AppRouter() {
         <Route path="/auth/telegram/callback" element={<TelegramCallbackPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+        <Route path="/delete-account" element={<DeleteAccountPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/track/:token" element={<PublicTrackingPage />} />
 
