@@ -103,21 +103,28 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
   ];
   const isTrackable = load != null && TRACKABLE_STATUSES.includes(load.status);
 
-  useLoadPositionWS({
-    loadId,
-    enabled: !!isTrackable,
-    onPosition: (pos) => setPosition(pos),
-  });
-
   const { status: connectionStatus } = useConnectionStatus({
     loadId,
     enabled: !!isTrackable,
   });
 
   // Wait for the load, so the hook starts once, already knowing if it's live.
-  const { trackPoints, route } = useLoadTrack({
+  const { trackPoints, route, addPoints } = useLoadTrack({
     basePath: load ? `/loads/${loadId}` : null,
     live: isTrackable,
+  });
+
+  // The phone sends points in batches, and a batch may carry late points
+  // from its offline queue: the marker only moves forward in time.
+  useLoadPositionWS({
+    loadId,
+    enabled: !!isTrackable,
+    onPosition: (pos) => {
+      addPoints([pos]);
+      setPosition((prev) =>
+        prev && new Date(prev.recorded_at).getTime() >= new Date(pos.recorded_at).getTime() ? prev : pos
+      );
+    },
   });
 
   const fetchLoad = useCallback(async () => {
@@ -279,7 +286,10 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
       : null;
 
   const carrierPosition = position ? { lat: position.lat, lng: position.lng } : null;
-  const speedKmh = position ? Math.round((position.speed_mps ?? 0) * 3.6) : null;
+  // The phone sends nothing while the truck stands, so the last point's
+  // speed is only current while it's moving.
+  const isMoving = connectionStatus?.state === "moving";
+  const speedKmh = position && isMoving ? Math.round((position.speed_mps ?? 0) * 3.6) : null;
 
   return (
     <div className={`flex flex-col ${isModal ? "h-full" : "h-[calc(100vh-4rem)]"}`}>
@@ -328,19 +338,24 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
               </Button>
             )}
             {canConfirm && (
-              <Button
-                size="sm"
-                onClick={handleConfirm}
-                disabled={confirmLoading}
-                className="gap-1 bg-success hover:bg-success/90"
-              >
-                {confirmLoading ? (
-                  <Spinner size={14} className="text-primary-foreground" />
-                ) : (
-                  <CheckCircle2 size={14} />
-                )}
-                {t("load_detail_confirm_delivery")}
-              </Button>
+              // The driver's phone keeps tracking after "dropped off" until
+              // the shipper confirms (or for 24 h at most).
+              <div className="flex flex-col items-center gap-0.5">
+                <Button
+                  size="sm"
+                  onClick={handleConfirm}
+                  disabled={confirmLoading}
+                  className="gap-1 bg-success hover:bg-success/90"
+                >
+                  {confirmLoading ? (
+                    <Spinner size={14} className="text-primary-foreground" />
+                  ) : (
+                    <CheckCircle2 size={14} />
+                  )}
+                  {t("load_detail_confirm_delivery")}
+                </Button>
+                <span className="text-[10px] text-muted-foreground">{t("load_detail_confirm_delivery_hint")}</span>
+              </div>
             )}
             {canCancel && (
               <AlertDialog>
@@ -505,7 +520,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
 
                   {isTrackable && position && (() => {
                     const etaMinutes =
-                      dropoff && (position.speed_mps ?? 0) > 0.5
+                      dropoff && isMoving && position.speed_mps != null && position.speed_mps > 0.5
                         ? Math.round(
                             (haversineKm(position.lat, position.lng, dropoff.lat, dropoff.lng) /
                               (position.speed_mps * 3.6)) *
@@ -520,7 +535,9 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                             <span className="text-[10px] uppercase">{t("load_detail_telemetry_speed")}</span>
                           </div>
                           <p className="text-sm font-bold tabular-nums">
-                            {speedKmh} <span className="text-[10px] font-normal text-muted-foreground">km/h</span>
+                            {speedKmh === null ? "—" : (
+                              <>{speedKmh} <span className="text-[10px] font-normal text-muted-foreground">km/h</span></>
+                            )}
                           </p>
                         </div>
                         <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
@@ -529,7 +546,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                             <span className="text-[10px] uppercase">{t("load_detail_telemetry_heading")}</span>
                           </div>
                           <p className="text-sm font-bold tabular-nums">
-                            {Math.round(position.heading_deg)}°
+                            {position.heading_deg === null ? "—" : `${Math.round(position.heading_deg)}°`}
                           </p>
                         </div>
                         <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
@@ -538,7 +555,9 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                             <span className="text-[10px] uppercase">{t("load_detail_telemetry_accuracy")}</span>
                           </div>
                           <p className="text-sm font-bold tabular-nums">
-                            {Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">m</span>
+                            {position.accuracy_m === null ? "—" : (
+                              <>{Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">m</span></>
+                            )}
                           </p>
                         </div>
                         <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">

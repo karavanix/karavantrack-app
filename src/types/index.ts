@@ -342,41 +342,43 @@ export interface PublicTrackingResponse {
 }
 
 // ──── Connection status ────
-// Whether the driver's phone is actually reachable and streaming GPS for a
-// load — as opposed to whether *this browser* has a WebSocket open.
-export type ConnectionState = "not_started" | "live" | "economy" | "disconnected" | "gps_disabled";
+// What the driver's phone is doing on a load, judged by the GPS points it
+// sent: moving, standing (the phone sends nothing while standing), silent
+// while it should be moving, or with GPS off. not_started = not tracked.
+export type ConnectionState = "not_started" | "moving" | "stopped" | "no_data" | "gps_disabled";
 
 export interface ConnectionStatus {
   state: ConnectionState;
-  reason?: string;
+  /** gps_disabled only: location services off, or the permission gone. */
+  reason?: "location_off" | "permission_denied";
+  /** When the truck stopped (stopped) or GPS went off (gps_disabled). */
+  since?: string;
   last_point_at?: string;
+  /** The phone's battery, 0..1, as of the latest point that reported it. */
+  battery_level?: number;
+  is_charging?: boolean;
 }
 
 // ──── Tracking ────
-export interface Position {
-  load_id: string;
-  carrier_id: string;
-  lat: number;
-  lng: number;
-  speed_mps: number;
-  heading_deg: number;
-  accuracy_m: number;
-  recorded_at: string;
-}
-
 export interface TrackPoint {
   lat: number;
   lng: number;
-  speed_mps: number;
-  heading_deg: number;
-  accuracy_m: number;
+  /** null when the phone didn't report it. */
+  speed_mps: number | null;
+  heading_deg: number | null;
+  accuracy_m: number | null;
   recorded_at: string;
 }
 
+export interface Position extends TrackPoint {
+  load_id: string;
+  carrier_id: string;
+}
+
+/** GET /track, oldest first; ?after=<RFC 3339> for only the newer points. */
 export interface TrackResponse {
   load_id: string;
   points: TrackPoint[];
-  total: number;
 }
 
 /**
