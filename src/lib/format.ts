@@ -10,6 +10,16 @@ export function formatDuration(minutes: number, t: TFunction): string {
   return t("duration_hours_minutes", { h, m });
 }
 
+/** "14:32" today, "3 Oct, 14:32" on another day, in the current language. */
+export function formatClock(at: string, lang: string, now = Date.now()): string {
+  const date = new Date(at);
+  const time: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
+  if (date.toDateString() === new Date(now).toDateString()) {
+    return date.toLocaleTimeString(lang, time);
+  }
+  return date.toLocaleString(lang, { day: "numeric", month: "short", ...time });
+}
+
 /** "34.7 km" under 100 km, "412 km" above, with the language's number format. */
 export function formatDistance(meters: number, lang: string, t: TFunction): string {
   const km = meters / 1000;

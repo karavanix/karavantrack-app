@@ -1,12 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { api } from "@/lib/api";
 import type { LoadRoute, TrackPoint, TrackResponse } from "@/types";
 
-/** Page size for the first load; later pulls expect only a few new points. */
-const TRACK_PAGE_SIZE = 1000;
-const TRACK_UPDATE_PAGE_SIZE = 50;
-/** The live tail runs to the carrier marker anyway, which updates faster. */
+/** New points also come over the WS on the load page; this is the fallback. */
 const TRACK_POLL_MS = 30_000;
 /** The backend re-matches a moving load at most once a minute. */
 const ROUTE_POLL_MS = 60_000;
@@ -18,51 +15,95 @@ interface UseLoadTrackOptions {
   live: boolean;
 }
 
+const ms = (at: string) => new Date(at).getTime();
+
 /**
- * The load's raw track points and its route matched to roads. The route is
- * null until the backend has matched the track (or when matching is off); the
- * map then draws the raw points.
+ * The load's route matched to roads and the raw points the route doesn't
+ * cover yet (the live tail). The route is null until the backend has matched
+ * the track (or when matching is off); then the points are the whole track.
+ *
+ * The route covers the track up to its matched_until, so only the points
+ * after it are fetched: /track?after=matched_until, then ?after=the newest
+ * point shown. Points the route has since covered are dropped. A late point
+ * from the phone's offline queue lands before the newest one shown and gets
+ * drawn by the next re-match.
  */
 export function useLoadTrack({ basePath, live }: UseLoadTrackOptions) {
   const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
   const [route, setRoute] = useState<LoadRoute | null>(null);
+  /** recorded_at of the newest point shown, as the server sent it. */
+  const newestRef = useRef<string | null>(null);
+
+  /** Appends points newer than the newest shown, e.g. from the WS. */
+  const addPoints = useCallback((points: TrackPoint[]) => {
+    const fresh: TrackPoint[] = [];
+    for (const p of points) {
+      if (newestRef.current !== null && ms(p.recorded_at) <= ms(newestRef.current)) continue;
+      fresh.push(p);
+      newestRef.current = p.recorded_at;
+    }
+    if (fresh.length > 0) setTrackPoints((prev) => prev.concat(fresh));
+  }, []);
 
   useEffect(() => {
     if (!basePath) return;
     let cancelled = false;
-    let loadedOnce = false;
-    /** How many points of the server's list have been read so far. */
-    let read = 0;
-    let newestAt = -Infinity;
     let pulling = false;
+    newestRef.current = null;
 
-    // /track returns points oldest first, so new ones land at the end: read
-    // on from where the last pull stopped. A late point from the phone's
-    // offline queue lands earlier (by its recorded_at) and shifts the list,
-    // so keep only points newer than the newest shown. The first pull
-    // replaces whatever was shown for a previous basePath.
+    const fetchTrack = async (after: string | null) => {
+      const query = after ? `?after=${encodeURIComponent(after)}` : "";
+      const { data } = await api.get<TrackResponse>(`${basePath}/track${query}`);
+      return data?.points ?? [];
+    };
+
+    /** The route, null when there's none (404), undefined on other errors. */
+    const fetchRoute = async (): Promise<LoadRoute | null | undefined> => {
+      try {
+        const { data } = await api.get<LoadRoute>(`${basePath}/route`);
+        return data;
+      } catch (err) {
+        return axios.isAxiosError(err) && err.response?.status === 404 ? null : undefined;
+      }
+    };
+
+    const applyRoute = (next: LoadRoute | null) => {
+      // Same updated_at = not re-matched since: keep the object, so the
+      // map doesn't redraw the whole route every minute.
+      setRoute((prev) => (prev?.updated_at === next?.updated_at ? prev : next));
+      if (!next?.matched_until) return;
+      const until = ms(next.matched_until);
+      setTrackPoints((prev) => {
+        const kept = prev.filter((p) => ms(p.recorded_at) > until);
+        return kept.length === prev.length ? prev : kept;
+      });
+    };
+
+    // The route first: it tells how much of the track needs no raw points.
+    // The first pull replaces whatever was shown for a previous basePath.
+    const start = async () => {
+      pulling = true;
+      try {
+        const first = await fetchRoute();
+        if (cancelled) return;
+        if (first !== undefined) setRoute(first);
+        const points = await fetchTrack(first?.matched_until ?? null);
+        if (cancelled) return;
+        setTrackPoints(points);
+        newestRef.current = points.length > 0 ? points[points.length - 1].recorded_at : null;
+      } catch {
+        // The next poll retries
+      } finally {
+        pulling = false;
+      }
+    };
+
     const pullTrack = async () => {
       if (pulling) return;
       pulling = true;
       try {
-        const fresh: TrackPoint[] = [];
-        const pageSize = loadedOnce ? TRACK_UPDATE_PAGE_SIZE : TRACK_PAGE_SIZE;
-        let offset = read;
-        for (;;) {
-          const { data } = await api.get<TrackResponse>(
-            `${basePath}/track?limit=${pageSize}&offset=${offset}`
-          );
-          const points = data?.points ?? [];
-          offset += points.length;
-          fresh.push(...points.filter((p) => new Date(p.recorded_at).getTime() > newestAt));
-          if (points.length < pageSize) break;
-        }
-        if (cancelled) return;
-        read = offset;
-        if (fresh.length > 0) newestAt = new Date(fresh[fresh.length - 1].recorded_at).getTime();
-        if (!loadedOnce) setTrackPoints(fresh);
-        else if (fresh.length > 0) setTrackPoints((prev) => prev.concat(fresh));
-        loadedOnce = true;
+        const points = await fetchTrack(newestRef.current);
+        if (!cancelled) addPoints(points);
       } catch {
         // Keep showing the last known track on transient errors
       } finally {
@@ -71,22 +112,11 @@ export function useLoadTrack({ basePath, live }: UseLoadTrackOptions) {
     };
 
     const pullRoute = async () => {
-      try {
-        const { data } = await api.get<LoadRoute>(`${basePath}/route`);
-        // Same updated_at = not re-matched since: keep the object, so the
-        // map doesn't redraw the whole route every minute.
-        if (!cancelled) setRoute((prev) => (prev?.updated_at === data.updated_at ? prev : data));
-      } catch (err) {
-        // 404: not matched yet or matching is off. Other errors keep the
-        // last known route.
-        if (!cancelled && axios.isAxiosError(err) && err.response?.status === 404) {
-          setRoute(null);
-        }
-      }
+      const next = await fetchRoute();
+      if (!cancelled && next !== undefined) applyRoute(next);
     };
 
-    pullTrack();
-    pullRoute();
+    start();
     if (!live) {
       return () => { cancelled = true; };
     }
@@ -98,7 +128,7 @@ export function useLoadTrack({ basePath, live }: UseLoadTrackOptions) {
       clearInterval(trackTimer);
       clearInterval(routeTimer);
     };
-  }, [basePath, live]);
+  }, [basePath, live, addPoints]);
 
-  return { trackPoints, route };
+  return { trackPoints, route, addPoints };
 }

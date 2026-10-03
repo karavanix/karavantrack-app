@@ -13,7 +13,8 @@ import { formatDistance } from "@/lib/format";
 import { useLoadTrack } from "@/hooks/use-load-track";
 import type { PublicTrackingResponse } from "@/types";
 
-const POLL_MS = 5000;
+// The phone sends its points in batches about once a minute.
+const POLL_MS = 15_000;
 
 const TRACKABLE_STATUSES = [
   "assigned",
@@ -61,7 +62,7 @@ export default function PublicTrackingPage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  // ── Poll for fresh position + status every 5s ──
+  // ── Poll for fresh position + status ──
   useEffect(() => {
     if (!token || state !== "loaded") return;
 
