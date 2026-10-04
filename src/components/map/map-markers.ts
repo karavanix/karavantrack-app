@@ -104,6 +104,25 @@ export function createMapMarker(
 }
 
 /**
+ * A driver's step (pickup started, delivered…) where the phone was at the
+ * time: a small ring, so it doesn't pass for the planned pickup/dropoff
+ * points.
+ */
+export function createStepMarker(color: string, lngLat: [number, number]) {
+  const el = document.createElement("div");
+  el.style.cssText = `
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: white;
+    border: 4px solid ${color};
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+    cursor: pointer;
+  `;
+  return new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat(lngLat);
+}
+
+/**
  * Update the heading arrow rotation on a carrier marker.
  * `headingDeg` is degrees clockwise from north (0 = north, 90 = east).
  */

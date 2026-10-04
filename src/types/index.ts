@@ -225,6 +225,14 @@ export interface LoadHistoryAttachment {
   created_at: string;
 }
 
+/** Where the driver's phone was at a status change. */
+export interface LoadHistoryLocation {
+  lat: number;
+  lng: number;
+  accuracy_m?: number;
+  recorded_at: string;
+}
+
 export interface LoadHistoryEntry {
   id: number;
   user_id?: string;
@@ -233,6 +241,8 @@ export interface LoadHistoryEntry {
   note?: string;
   created_at: string;
   attachments: LoadHistoryAttachment[];
+  /** Absent when the app sent no fix with the step (or an older app). */
+  location?: LoadHistoryLocation;
 }
 
 export interface Load {
