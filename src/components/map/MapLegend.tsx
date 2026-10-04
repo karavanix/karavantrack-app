@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type LegendItem = {
-  type: "dot" | "line" | "stop";
+  type: "dot" | "line" | "stop" | "ring";
   color: string;
   label: string;
   dash?: string;
   /** Only meaningful once the track is matched to roads. */
   routeOnly?: boolean;
+  /** Only when the driver's steps are on the map. */
+  stepsOnly?: boolean;
 };
 
 const ITEMS: LegendItem[] = [
@@ -19,12 +21,13 @@ const ITEMS: LegendItem[] = [
   { type: "line", color: "#94a3b8", label: "map_legend_raw", routeOnly: true },
   { type: "line", color: "#94a3b8", label: "map_legend_gap", dash: "4 3", routeOnly: true },
   { type: "stop", color: "#334155", label: "map_legend_stop", routeOnly: true },
+  { type: "ring", color: "#334155", label: "map_legend_step", stepsOnly: true },
 ];
 
 /**
  * Collapsible map legend overlay — positioned bottom-right.
  */
-export function MapLegend({ hasRoute = false }: { hasRoute?: boolean }) {
+export function MapLegend({ hasRoute = false, hasSteps = false }: { hasRoute?: boolean; hasSteps?: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -49,7 +52,7 @@ export function MapLegend({ hasRoute = false }: { hasRoute?: boolean }) {
             </button>
           </div>
 
-          {ITEMS.filter((item) => hasRoute || !item.routeOnly).map((item) => (
+          {ITEMS.filter((item) => (hasRoute || !item.routeOnly) && (hasSteps || !item.stepsOnly)).map((item) => (
             <div key={item.label} className="flex items-center gap-2">
               {item.type === "dot" && (
                 <span
@@ -67,6 +70,12 @@ export function MapLegend({ hasRoute = false }: { hasRoute?: boolean }) {
                     strokeDasharray={item.dash}
                   />
                 </svg>
+              )}
+              {item.type === "ring" && (
+                <span
+                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-white shadow-sm"
+                  style={{ border: `3px solid ${item.color}` }}
+                />
               )}
               {item.type === "stop" && (
                 <span

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
 import { ConnectionStatusBadge } from "@/components/loads/connection-status-badge";
-import MapLibreTrackingMap from "@/components/map/MapLibreTrackingMap";
+import MapLibreTrackingMap, { type MapStep } from "@/components/map/MapLibreTrackingMap";
 import { CopyLinkPanel } from "@/components/shared/copy-link-panel";
 import { CarrierPicker } from "@/components/loads/carrier-picker";
 import { LoadHistoryTimeline } from "@/components/loads/load-history-timeline";
@@ -113,6 +113,17 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
     basePath: load ? `/loads/${loadId}` : null,
     live: isTrackable,
   });
+
+  // The driver's steps the app sent a location with, marked on the map.
+  const steps = useMemo<MapStep[]>(
+    () =>
+      (load?.history ?? []).flatMap((h) =>
+        h.location
+          ? [{ id: h.id, status: h.to_status, lat: h.location.lat, lng: h.location.lng, at: h.created_at, note: h.note }]
+          : []
+      ),
+    [load?.history]
+  );
 
   // The phone sends points in batches, and a batch may carry late points
   // from its offline queue: the marker only moves forward in time.
@@ -409,6 +420,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
             carrierHeading={position?.heading_deg}
             trackPoints={trackPoints}
             route={route}
+            steps={steps}
             trackable={isTrackable}
           />
           <div className="absolute top-3 right-3 z-20">

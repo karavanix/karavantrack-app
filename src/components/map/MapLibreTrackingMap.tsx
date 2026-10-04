@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import maplibregl, { LngLatBounds, type MapLayerMouseEvent } from "maplibre-gl";
 import { useMapLibre, type LatLng } from "@/hooks/use-maplibre";
-import { createMapMarker, updateMarkerHeading } from "@/components/map/map-markers";
+import { createMapMarker, createStepMarker, updateMarkerHeading } from "@/components/map/map-markers";
 import { MapOverlay } from "@/components/map/MapOverlay";
 import { MapLegend } from "@/components/map/MapLegend";
 import {
@@ -15,7 +15,7 @@ import {
   type TrackPointProps,
 } from "@/components/map/track-overlay";
 import { formatDuration } from "@/lib/format";
-import type { LoadRoute, TrackPoint } from "@/types";
+import type { LoadRoute, LoadStatus, TrackPoint } from "@/types";
 
 export type { LatLng };
 
@@ -26,6 +26,29 @@ type MapTrackPoint = Pick<TrackPoint, "lat" | "lng" | "recorded_at">;
 
 const NO_POINTS: MapTrackPoint[] = [];
 
+/** A driver's status change, marked where the phone was at the time. */
+export type MapStep = {
+  id: number;
+  status: LoadStatus;
+  lat: number;
+  lng: number;
+  /** When the status changed. */
+  at: string;
+  note?: string;
+};
+
+const NO_STEPS: MapStep[] = [];
+
+/** At the pickup green, setting off amber, at the dropoff red. */
+const STEP_COLORS: Partial<Record<LoadStatus, string>> = {
+  picking_up: "#16a34a",
+  picked_up: "#16a34a",
+  in_transit: "#f59e0b",
+  dropping_off: "#dc2626",
+  dropped_off: "#dc2626",
+};
+const STEP_COLOR_OTHER = "#334155";
+
 type Props = {
   pickup: LatLng | null;
   dropoff: LatLng | null;
@@ -35,6 +58,8 @@ type Props = {
   trackPoints: MapTrackPoint[];
   /** The track matched to roads; null until matched or with matching off. */
   route?: LoadRoute | null;
+  /** The driver's steps that came with a location. */
+  steps?: MapStep[];
   className?: string;
   /** If true, the follow-carrier toggle is shown and starts enabled */
   trackable?: boolean;
@@ -72,6 +97,7 @@ export default function MapLibreTrackingMap({
   carrierHeading,
   trackPoints,
   route = null,
+  steps = NO_STEPS,
   className,
   trackable = false,
 }: Props) {
@@ -320,6 +346,38 @@ export default function MapLibreTrackingMap({
     };
   }, [isReady, mapRef, t, i18n.language]);
 
+  // ── Driver's steps, with a tooltip on hover, or on tap for touch screens ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady || steps.length === 0) return;
+
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+    const markers = steps.map((step) => {
+      const lngLat: [number, number] = [step.lng, step.lat];
+      const marker = createStepMarker(STEP_COLORS[step.status] ?? STEP_COLOR_OTHER, lngLat).addTo(map);
+      const show = () => {
+        // A load may take days: the date too, not only the time.
+        const at = new Date(step.at).toLocaleString(i18n.language, {
+          day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+        });
+        const label = t(`map_step_${step.status}`, { defaultValue: step.status });
+        popup
+          .setLngLat(lngLat)
+          .setText(`${label} · ${at}${step.note ? ` — ${step.note}` : ""}`)
+          .addTo(map);
+      };
+      const el = marker.getElement();
+      el.addEventListener("mouseenter", show);
+      el.addEventListener("click", show);
+      el.addEventListener("mouseleave", () => popup.remove());
+      return marker;
+    });
+    return () => {
+      for (const marker of markers) marker.remove();
+      popup.remove();
+    };
+  }, [steps, isReady, mapRef, t, i18n.language]);
+
   // ── Initial bounds fit (runs once when map becomes ready) ──
   useEffect(() => {
     const map = mapRef.current;
@@ -404,7 +462,7 @@ export default function MapLibreTrackingMap({
     <div className="relative h-full w-full">
       <div ref={containerRef} className={className ?? "h-full w-full"} />
       <MapOverlay isReady={isReady} error={error} />
-      <MapLegend hasRoute={route != null} />
+      <MapLegend hasRoute={route != null} hasSteps={steps.length > 0} />
 
       {showFollowButton && (
         <button
