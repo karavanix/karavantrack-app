@@ -48,9 +48,9 @@ export function useLoadPositionWS({
             carrier_id: (d.carrier_id as string) || "",
             lat: d.lat as number,
             lng: d.lng as number,
-            speed_mps: (d.speed_mps as number) ?? 0,
-            heading_deg: (d.heading_deg as number) ?? 0,
-            accuracy_m: (d.accuracy_m as number) ?? 0,
+            speed_mps: (d.speed_mps as number | null) ?? null,
+            heading_deg: (d.heading_deg as number | null) ?? null,
+            accuracy_m: (d.accuracy_m as number | null) ?? null,
             recorded_at: (d.recorded_at as string) || new Date().toISOString(),
           };
           setLastPosition(pos);
