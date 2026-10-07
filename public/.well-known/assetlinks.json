@@ -4,7 +4,10 @@
     "target": {
       "namespace": "android_app",
       "package_name": "yool.live.app",
-      "sha256_cert_fingerprints": ["54:A5:1F:74:99:82:5D:11:AB:6E:07:50:6C:F5:C8:EC:42:4D:92:AD:E0:A4:BE:07:2A:FC:AC:6E:78:93:AC:DE"]
+      "sha256_cert_fingerprints": [
+        "54:A5:1F:74:99:82:5D:11:AB:6E:07:50:6C:F5:C8:EC:42:4D:92:AD:E0:A4:BE:07:2A:FC:AC:6E:78:93:AC:DE",
+        "12:54:D0:D6:43:A8:F5:D6:73:B8:0B:24:94:6D:E7:3A:AF:3A:7F:25:A6:51:FC:42:A8:F4:F9:F2:A4:09:2B:C9"
+      ]
     }
   }
 ]
