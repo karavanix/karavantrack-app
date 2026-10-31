@@ -4,6 +4,9 @@ import { getFirebaseMessaging, VAPID_KEY } from "@/lib/firebase";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 
+/** Fired on window for every push that arrives while the tab is open; detail = the push's data. */
+export const PUSH_EVENT = "yoollive:push";
+
 type PermissionState = "default" | "granted" | "denied" | "unsupported";
 
 interface UseNotificationsReturn {
@@ -71,6 +74,7 @@ export function useNotifications(): UseNotificationsReturn {
     if (!messaging) return;
 
     const unsubscribe = onMessage(messaging, (payload) => {
+      window.dispatchEvent(new CustomEvent(PUSH_EVENT, { detail: payload.data }));
       const notification = payload.notification;
       if (!notification) return;
       new Notification(notification.title ?? "KaravanTrack", {
