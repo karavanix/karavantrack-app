@@ -144,7 +144,7 @@ export default function MapLibrePickupMap({
     }
 
     if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = createMapMarker("pickup", [pickup.lng, pickup.lat], t("map_marker_pickup"))
+      pickupMarkerRef.current = createMapMarker("pickup", [pickup.lng, pickup.lat], t("map_legend_pickup"))
         .addTo(map);
     } else {
       pickupMarkerRef.current.setLngLat([pickup.lng, pickup.lat]);
@@ -163,7 +163,7 @@ export default function MapLibrePickupMap({
     }
 
     if (!dropoffMarkerRef.current) {
-      dropoffMarkerRef.current = createMapMarker("dropoff", [dropoff.lng, dropoff.lat], t("map_marker_dropoff"))
+      dropoffMarkerRef.current = createMapMarker("dropoff", [dropoff.lng, dropoff.lat], t("map_legend_dropoff"))
         .addTo(map);
     } else {
       dropoffMarkerRef.current.setLngLat([dropoff.lng, dropoff.lat]);

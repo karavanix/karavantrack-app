@@ -203,7 +203,7 @@ export default function MapLibreTrackingMap({
     const lngLat: [number, number] = [Number(pickup.lng), Number(pickup.lat)];
 
     if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = createMapMarker("pickup", lngLat, t("map_marker_pickup"))
+      pickupMarkerRef.current = createMapMarker("pickup", lngLat, t("map_legend_pickup"))
         .addTo(map);
     } else {
       pickupMarkerRef.current.setLngLat(lngLat);
@@ -224,7 +224,7 @@ export default function MapLibreTrackingMap({
     const lngLat: [number, number] = [Number(dropoff.lng), Number(dropoff.lat)];
 
     if (!dropoffMarkerRef.current) {
-      dropoffMarkerRef.current = createMapMarker("dropoff", lngLat, t("map_marker_dropoff"))
+      dropoffMarkerRef.current = createMapMarker("dropoff", lngLat, t("map_legend_dropoff"))
         .addTo(map);
     } else {
       dropoffMarkerRef.current.setLngLat(lngLat);
@@ -248,7 +248,7 @@ export default function MapLibreTrackingMap({
     ];
 
     if (!carrierMarkerRef.current) {
-      carrierMarkerRef.current = createMapMarker("carrier", lngLat, t("map_marker_carrier"))
+      carrierMarkerRef.current = createMapMarker("carrier", lngLat, t("map_legend_carrier"))
         .addTo(map);
     } else {
       carrierMarkerRef.current.setLngLat(lngLat);
