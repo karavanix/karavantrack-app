@@ -4,35 +4,42 @@ import { LoadCard } from "@/components/loads/load-card";
 import { LoadDetailModal } from "@/components/loads/load-detail-modal";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Load, LoadStats } from "@/types";
 
+// `label` is the column id (dashboard keys its data by it); the title comes from `titleKey`.
 export const PHASE_COLUMNS = [
   {
     label: "New",
+    titleKey: "kanban_col_new",
     statuses: ["created"],
     statsKeys: ["created"] as (keyof LoadStats)[],
     accent: "border-t-blue-400",
   },
   {
     label: "Assigned",
+    titleKey: "kanban_col_assigned",
     statuses: ["assigned", "accepted"],
     statsKeys: ["assigned", "accepted"] as (keyof LoadStats)[],
     accent: "border-t-violet-400",
   },
   {
     label: "Pickup",
+    titleKey: "kanban_col_pickup",
     statuses: ["picking_up", "picked_up"],
     statsKeys: ["picking_up", "picked_up"] as (keyof LoadStats)[],
     accent: "border-t-amber-400",
   },
   {
     label: "In Transit",
+    titleKey: "kanban_col_in_transit",
     statuses: ["in_transit", "dropping_off", "dropped_off"],
     statsKeys: ["in_transit", "dropping_off", "dropped_off"] as (keyof LoadStats)[],
     accent: "border-t-orange-400",
   },
   {
     label: "Delivered",
+    titleKey: "kanban_col_delivered",
     statuses: ["confirmed"],
     statsKeys: ["confirmed"] as (keyof LoadStats)[],
     accent: "border-t-green-500",
@@ -85,6 +92,7 @@ export function LoadKanban({
   onLoadMore,
   onLoadMoreCancelled,
 }: LoadKanbanProps) {
+  const { t } = useTranslation();
   const [cancelledOpen, setCancelledOpen] = useState(false);
   const [quickViewId, setQuickViewId] = useState<string | null>(null);
   const [assignTargetId, setAssignTargetId] = useState<string | null>(null);
@@ -122,7 +130,7 @@ export function LoadKanban({
           >
             {/* Column header */}
             <div className="px-3 py-2.5 flex items-center justify-between border-b border-border/50">
-              <p className="text-sm font-semibold">{phase.label}</p>
+              <p className="text-sm font-semibold">{t(phase.titleKey)}</p>
               <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-background border text-xs font-semibold px-1.5">
                 {count}
               </span>
@@ -131,7 +139,7 @@ export function LoadKanban({
             {/* Cards */}
             <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
               {data.loads.length === 0 ? (
-                <p className="py-6 text-center text-[11px] text-muted-foreground/60">No loads</p>
+                <p className="py-6 text-center text-[11px] text-muted-foreground/60">{t("kanban_no_loads")}</p>
               ) : (
                 data.loads.map((load) => (
                   <LoadCard
@@ -158,7 +166,7 @@ export function LoadKanban({
                   ) : (
                     <ChevronDown size={13} />
                   )}
-                  {data.loadingMore ? "Loading…" : `Load more (${count - data.loads.length} remaining)`}
+                  {data.loadingMore ? t("common_loading") : t("kanban_load_more", { n: count - data.loads.length })}
                 </Button>
               )}
             </div>
@@ -182,7 +190,7 @@ export function LoadKanban({
         >
           {cancelledOpen ? (
             <>
-              <p className="text-sm font-semibold">Cancelled</p>
+              <p className="text-sm font-semibold">{t("kanban_col_cancelled")}</p>
               <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-background border text-xs font-semibold px-1.5">
                 {cancelledCount}
               </span>
@@ -194,7 +202,7 @@ export function LoadKanban({
                 style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
                 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest"
               >
-                Cancelled
+                {t("kanban_col_cancelled")}
               </span>
             </div>
           )}
@@ -203,7 +211,7 @@ export function LoadKanban({
         {cancelledOpen && (
           <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
             {cancelledLoads.length === 0 ? (
-              <p className="py-6 text-center text-[11px] text-muted-foreground/60">No loads</p>
+              <p className="py-6 text-center text-[11px] text-muted-foreground/60">{t("kanban_no_loads")}</p>
             ) : (
               cancelledLoads.map((load) => (
                 <LoadCard key={load.id} load={load} carrierMap={carrierMap} onQuickView={setQuickViewId} />
@@ -219,8 +227,8 @@ export function LoadKanban({
               >
                 {cancelledLoadingMore ? <Spinner size={12} /> : <ChevronDown size={13} />}
                 {cancelledLoadingMore
-                  ? "Loading…"
-                  : `Load more (${cancelledCount - cancelledLoads.length} remaining)`}
+                  ? t("common_loading")
+                  : t("kanban_load_more", { n: cancelledCount - cancelledLoads.length })}
               </Button>
             )}
           </div>

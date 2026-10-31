@@ -9,20 +9,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTranslation } from "react-i18next";
 import type { Carrier } from "@/types";
 
 const STATUS_OPTIONS = [
-  { value: "all",          label: "All statuses" },
-  { value: "created",      label: "New" },
-  { value: "assigned",     label: "Assigned" },
-  { value: "accepted",     label: "Accepted" },
-  { value: "picking_up",   label: "Picking Up" },
-  { value: "picked_up",    label: "Picked Up" },
-  { value: "in_transit",   label: "In Transit" },
-  { value: "dropping_off", label: "Dropping Off" },
-  { value: "dropped_off",  label: "Dropped Off" },
-  { value: "confirmed",    label: "Delivered" },
-  { value: "cancelled",    label: "Cancelled" },
+  { value: "all", labelKey: "filter_status_all" },
+  { value: "created", labelKey: "status_created" },
+  { value: "assigned", labelKey: "status_assigned" },
+  { value: "accepted", labelKey: "status_accepted" },
+  { value: "picking_up", labelKey: "status_picking_up" },
+  { value: "picked_up", labelKey: "status_picked_up" },
+  { value: "in_transit", labelKey: "status_in_transit" },
+  { value: "dropping_off", labelKey: "status_dropping_off" },
+  { value: "dropped_off", labelKey: "status_dropped_off" },
+  { value: "confirmed", labelKey: "status_confirmed" },
+  { value: "cancelled", labelKey: "status_cancelled" },
 ];
 
 interface LoadFiltersProps {
@@ -46,6 +47,7 @@ export function LoadFilters({
   carriers,
   showStatusFilter = true,
 }: LoadFiltersProps) {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState(q);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -76,7 +78,7 @@ export function LoadFilters({
         <Input
           value={inputValue}
           onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Search loads…"
+          placeholder={t("filter_search_loads")}
           className="pl-8 h-9 text-sm"
         />
       </div>
@@ -85,12 +87,12 @@ export function LoadFilters({
       {showStatusFilter && (
         <Select value={statusFilter} onValueChange={onStatusFilterChange}>
           <SelectTrigger className="h-9 w-[160px] text-sm">
-            <SelectValue placeholder="All statuses" />
+            <SelectValue placeholder={t("filter_status_all")} />
           </SelectTrigger>
           <SelectContent>
             {STATUS_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+                {t(opt.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -101,10 +103,10 @@ export function LoadFilters({
       {carriers.length > 0 && (
         <Select value={carrierId || "__all__"} onValueChange={(v) => onCarrierIdChange(v === "__all__" ? "" : v)}>
           <SelectTrigger className="h-9 w-[160px] text-sm">
-            <SelectValue placeholder="All carriers" />
+            <SelectValue placeholder={t("filter_carrier_all")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">All carriers</SelectItem>
+            <SelectItem value="__all__">{t("filter_carrier_all")}</SelectItem>
             {carriers.map((c) => (
               <SelectItem key={c.carrier_id} value={c.carrier_id}>
                 {c.alias || `${c.first_name} ${c.last_name}`.trim()}
@@ -118,7 +120,7 @@ export function LoadFilters({
       {hasFilters && (
         <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1 text-muted-foreground h-9">
           <X size={13} />
-          Clear
+          {t("filter_clear")}
         </Button>
       )}
     </div>

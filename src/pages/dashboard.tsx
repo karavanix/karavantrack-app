@@ -580,7 +580,7 @@ export default function DashboardPage() {
             {/* ── Pagination controls ── */}
             {!isLoading && totalCount > LIST_LIMIT && (
               <div className="flex items-center justify-between text-sm text-muted-foreground pt-1">
-                <span>{`Showing ${pageStart}–${pageEnd} of ${totalCount}`}</span>
+                <span>{t("dashboard_showing", { from: pageStart, to: pageEnd, total: totalCount })}</span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="outline"
