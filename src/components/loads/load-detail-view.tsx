@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
@@ -6,6 +6,7 @@ import { api, getApiErrorMessage } from "@/lib/api";
 import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
 import { useLoadTrack } from "@/hooks/use-load-track";
 import { useConnectionStatus } from "@/hooks/use-connection-status";
+import { PUSH_EVENT } from "@/hooks/use-notifications";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/status-badge";
@@ -65,6 +66,9 @@ import { utcToLocalDisplay, utcToLocalTimeDisplay } from "@/lib/date-utils";
 import { formatDistance, formatDuration } from "@/lib/format";
 import { haversineKm } from "@/lib/geo";
 
+const LOAD_POLL_MS = 10000;
+const FINAL_STATUSES = ["confirmed", "cancelled", "completed"];
+
 interface LoadDetailViewProps {
   loadId: string;
   isModal?: boolean;
@@ -102,6 +106,8 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
     "dropping_off", "dropped_off",
   ];
   const isTrackable = load != null && TRACKABLE_STATUSES.includes(load.status);
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   const { status: connectionStatus } = useConnectionStatus({
     loadId,
@@ -138,12 +144,26 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
     },
   });
 
-  const fetchLoad = useCallback(async () => {
+  // `silent` is the background refresh: no spinner, no error banner, and the
+  // load is replaced only when the driver actually moved it on.
+  const fetchLoad = useCallback(async (silent = false) => {
     if (!loadId) return;
-    setIsLoading(true);
-    setError("");
+    if (!silent) {
+      setIsLoading(true);
+      setError("");
+    }
     try {
       const { data } = await api.get<Load>(`/loads/${loadId}`);
+      const prev = loadRef.current;
+      if (
+        silent &&
+        prev &&
+        prev.status === data.status &&
+        prev.updated_at === data.updated_at &&
+        (prev.history?.length ?? 0) === (data.history?.length ?? 0)
+      ) {
+        return;
+      }
       setLoad(data);
 
       if (TRACKABLE_STATUSES.includes(data.status)) {
@@ -157,15 +177,32 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
         setPosition(null);
       }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      if (!silent) setError(getApiErrorMessage(err));
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [loadId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchLoad();
   }, [fetchLoad]);
+
+  // The driver's steps don't come over the WS: poll the load until it's
+  // final, and refetch at once when a push about it arrives in this tab.
+  const isFinal = load != null && FINAL_STATUSES.includes(load.status);
+  useEffect(() => {
+    if (!loadId || !load || isFinal) return;
+    const timer = setInterval(() => fetchLoad(true), LOAD_POLL_MS);
+    const onPush = (e: Event) => {
+      const loadIdInPush = (e as CustomEvent<Record<string, string> | undefined>).detail?.load_id;
+      if (!loadIdInPush || loadIdInPush === loadId) fetchLoad(true);
+    };
+    window.addEventListener(PUSH_EVENT, onPush);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(PUSH_EVENT, onPush);
+    };
+  }, [loadId, !!load, isFinal, fetchLoad]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (autoOpenAssign && load?.status === "created" && !assignOpen) {
