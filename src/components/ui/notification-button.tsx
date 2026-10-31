@@ -1,9 +1,11 @@
 import { Bell, BellOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/use-notifications";
 import { Spinner } from "@/components/ui/spinner";
 
 export function NotificationButton() {
+  const { t } = useTranslation();
   const { permission, isLoading, requestPermission } = useNotifications();
 
   if (permission === "unsupported" || permission === "denied") return null;
@@ -16,8 +18,8 @@ export function NotificationButton() {
       disabled={isLoading || permission === "granted"}
       title={
         permission === "granted"
-          ? "Notifications enabled"
-          : "Enable push notifications"
+          ? t("notifications_enabled")
+          : t("notifications_enable")
       }
     >
       {isLoading ? (
