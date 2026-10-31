@@ -373,10 +373,10 @@ export interface ConnectionStatus {
 export interface TrackPoint {
   lat: number;
   lng: number;
-  /** null when the phone didn't report it. */
-  speed_mps: number | null;
-  heading_deg: number | null;
-  accuracy_m: number | null;
+  /** Missing (or null) when the phone didn't report it, e.g. a driver's step point. */
+  speed_mps?: number | null;
+  heading_deg?: number | null;
+  accuracy_m?: number | null;
   recorded_at: string;
 }
 

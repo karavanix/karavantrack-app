@@ -595,7 +595,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                             <span className="text-[10px] uppercase">{t("load_detail_telemetry_heading")}</span>
                           </div>
                           <p className="text-sm font-bold tabular-nums">
-                            {position.heading_deg === null ? "—" : `${Math.round(position.heading_deg)}°`}
+                            {position.heading_deg == null ? "—" : `${Math.round(position.heading_deg)}°`}
                           </p>
                         </div>
                         <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
@@ -604,7 +604,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                             <span className="text-[10px] uppercase">{t("load_detail_telemetry_accuracy")}</span>
                           </div>
                           <p className="text-sm font-bold tabular-nums">
-                            {position.accuracy_m === null ? "—" : (
+                            {position.accuracy_m == null ? "—" : (
                               <>{Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">{t("unit_m")}</span></>
                             )}
                           </p>
