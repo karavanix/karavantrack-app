@@ -197,7 +197,7 @@ export default function CarriersPage() {
       header: t("carriers_col_status"),
       cell: ({ row }) => {
         if (row.original.status === "invited") {
-          return <Badge variant="outline" className="text-yellow-600 border-yellow-600/30 bg-yellow-600/10 dark:text-yellow-400">Invited</Badge>;
+          return <Badge variant="outline" className="text-yellow-600 border-yellow-600/30 bg-yellow-600/10 dark:text-yellow-400">{t("carriers_status_invited")}</Badge>;
         }
         return (
           <Badge variant={row.original.is_free ? "success" : "secondary"}>

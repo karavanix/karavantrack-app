@@ -2,17 +2,17 @@ import maplibregl from "maplibre-gl";
 
 export type MarkerVariant = "pickup" | "dropoff" | "carrier";
 
-const VARIANT_CONFIG: Record<MarkerVariant, { color: string; label: string; pulse: boolean }> = {
-  pickup:  { color: "#16a34a", label: "Pickup",  pulse: false },
-  dropoff: { color: "#dc2626", label: "Dropoff", pulse: false },
-  carrier: { color: "#2563eb", label: "Carrier", pulse: true  },
+const VARIANT_CONFIG: Record<MarkerVariant, { color: string; pulse: boolean }> = {
+  pickup:  { color: "#16a34a", pulse: false },
+  dropoff: { color: "#dc2626", pulse: false },
+  carrier: { color: "#2563eb", pulse: true  },
 };
 
 /**
  * Creates a styled marker DOM element with a label and optional heading arrow.
  */
-function createMarkerElement(variant: MarkerVariant) {
-  const { color, label, pulse } = VARIANT_CONFIG[variant];
+function createMarkerElement(variant: MarkerVariant, label: string) {
+  const { color, pulse } = VARIANT_CONFIG[variant];
 
   const wrapper = document.createElement("div");
   wrapper.style.display = "flex";
@@ -95,10 +95,11 @@ function createMarkerElement(variant: MarkerVariant) {
  */
 export function createMapMarker(
   variant: MarkerVariant,
-  lngLat: [number, number]
+  lngLat: [number, number],
+  label: string
 ) {
   return new maplibregl.Marker({
-    element: createMarkerElement(variant),
+    element: createMarkerElement(variant, label),
     anchor: "bottom",
   }).setLngLat(lngLat);
 }

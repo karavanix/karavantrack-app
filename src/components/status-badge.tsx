@@ -1,32 +1,29 @@
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import type { LoadStatus } from "@/types";
 
-const statusConfig: Record<
+const statusVariant: Record<
   LoadStatus,
-  {
-    label: string;
-    variant:
-      | "default"
-      | "secondary"
-      | "destructive"
-      | "outline"
-      | "success"
-      | "warning"
-      | "info";
-  }
+  | "default"
+  | "secondary"
+  | "destructive"
+  | "outline"
+  | "success"
+  | "warning"
+  | "info"
 > = {
-  created:      { label: "Created",      variant: "secondary" },
-  assigned:     { label: "Assigned",     variant: "info" },
-  accepted:     { label: "Accepted",     variant: "info" },
-  picking_up:   { label: "Picking Up",   variant: "warning" },
-  picked_up:    { label: "Picked Up",    variant: "warning" },
-  in_transit:   { label: "In Transit",   variant: "warning" },
+  created:      "secondary",
+  assigned:     "info",
+  accepted:     "info",
+  picking_up:   "warning",
+  picked_up:    "warning",
+  in_transit:   "warning",
   // Progress toward delivery — visually distinct from "in transit" blue
-  dropping_off: { label: "Dropping Off", variant: "warning" },
-  dropped_off:  { label: "Dropped Off",  variant: "success" },
-  completed:    { label: "Completed",    variant: "success" },
-  confirmed:    { label: "Confirmed",    variant: "success" },
-  cancelled:    { label: "Cancelled",    variant: "destructive" },
+  dropping_off: "warning",
+  dropped_off:  "success",
+  completed:    "success",
+  confirmed:    "success",
+  cancelled:    "destructive",
 };
 
 interface StatusBadgeProps {
@@ -34,10 +31,9 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const config = statusConfig[status as LoadStatus] ?? {
-    label: status,
-    variant: "outline" as const,
-  };
+  const { t } = useTranslation();
+  const variant = statusVariant[status as LoadStatus];
+  if (!variant) return <Badge variant="outline">{status}</Badge>;
 
-  return <Badge variant={config.variant}>{config.label}</Badge>;
+  return <Badge variant={variant}>{t(`status_${status}`)}</Badge>;
 }

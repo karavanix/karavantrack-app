@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import maplibregl, { LngLatBounds } from "maplibre-gl";
+import { useTranslation } from "react-i18next";
 import { useMapLibre, type LatLng } from "@/hooks/use-maplibre";
 import { createMapMarker } from "@/components/map/map-markers";
 import { MapOverlay } from "@/components/map/MapOverlay";
@@ -123,6 +124,7 @@ export default function MapLibrePickupMap({
     });
   }, []);
 
+  const { t } = useTranslation();
   const { containerRef, mapRef, isReady, error } = useMapLibre({
     center: center ? [center.lng, center.lat] : [69.2401, 41.2995],
     zoom: 12,
@@ -142,12 +144,12 @@ export default function MapLibrePickupMap({
     }
 
     if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = createMapMarker("pickup", [pickup.lng, pickup.lat])
+      pickupMarkerRef.current = createMapMarker("pickup", [pickup.lng, pickup.lat], t("map_marker_pickup"))
         .addTo(map);
     } else {
       pickupMarkerRef.current.setLngLat([pickup.lng, pickup.lat]);
     }
-  }, [pickup, mapRef]);
+  }, [pickup, mapRef, t]);
 
   // ── Dropoff marker ──
   useEffect(() => {
@@ -161,12 +163,12 @@ export default function MapLibrePickupMap({
     }
 
     if (!dropoffMarkerRef.current) {
-      dropoffMarkerRef.current = createMapMarker("dropoff", [dropoff.lng, dropoff.lat])
+      dropoffMarkerRef.current = createMapMarker("dropoff", [dropoff.lng, dropoff.lat], t("map_marker_dropoff"))
         .addTo(map);
     } else {
       dropoffMarkerRef.current.setLngLat([dropoff.lng, dropoff.lat]);
     }
-  }, [dropoff, mapRef]);
+  }, [dropoff, mapRef, t]);
 
   // ── Route line + fit bounds ──
   useEffect(() => {

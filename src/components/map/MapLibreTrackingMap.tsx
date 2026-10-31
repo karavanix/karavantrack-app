@@ -203,12 +203,12 @@ export default function MapLibreTrackingMap({
     const lngLat: [number, number] = [Number(pickup.lng), Number(pickup.lat)];
 
     if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = createMapMarker("pickup", lngLat)
+      pickupMarkerRef.current = createMapMarker("pickup", lngLat, t("map_marker_pickup"))
         .addTo(map);
     } else {
       pickupMarkerRef.current.setLngLat(lngLat);
     }
-  }, [pickup, isReady, mapRef]);
+  }, [pickup, isReady, mapRef, t]);
 
   // ── Dropoff marker ──
   useEffect(() => {
@@ -224,12 +224,12 @@ export default function MapLibreTrackingMap({
     const lngLat: [number, number] = [Number(dropoff.lng), Number(dropoff.lat)];
 
     if (!dropoffMarkerRef.current) {
-      dropoffMarkerRef.current = createMapMarker("dropoff", lngLat)
+      dropoffMarkerRef.current = createMapMarker("dropoff", lngLat, t("map_marker_dropoff"))
         .addTo(map);
     } else {
       dropoffMarkerRef.current.setLngLat(lngLat);
     }
-  }, [dropoff, isReady, mapRef]);
+  }, [dropoff, isReady, mapRef, t]);
 
   // ── Carrier marker ──
   useEffect(() => {
@@ -248,14 +248,14 @@ export default function MapLibreTrackingMap({
     ];
 
     if (!carrierMarkerRef.current) {
-      carrierMarkerRef.current = createMapMarker("carrier", lngLat)
+      carrierMarkerRef.current = createMapMarker("carrier", lngLat, t("map_marker_carrier"))
         .addTo(map);
     } else {
       carrierMarkerRef.current.setLngLat(lngLat);
     }
 
     updateMarkerHeading(carrierMarkerRef.current, carrierHeading);
-  }, [carrierPosition, carrierHeading, isReady, mapRef]);
+  }, [carrierPosition, carrierHeading, isReady, mapRef, t]);
 
   // ── Planned route line ──
   useEffect(() => {
@@ -480,7 +480,7 @@ export default function MapLibreTrackingMap({
               : "bg-white/90 text-gray-700 hover:bg-white dark:bg-gray-900/90 dark:text-gray-200 dark:hover:bg-gray-800/90"
             }
           `}
-          title={following ? "Following carrier — click to pan freely" : "Click to follow carrier"}
+          title={following ? t("map_follow_on_hint") : t("map_follow_off_hint")}
         >
           <svg
             width="14"
@@ -513,7 +513,7 @@ export default function MapLibreTrackingMap({
               </>
             )}
           </svg>
-          {following ? "Following" : "Free pan"}
+          {following ? t("map_follow_on") : t("map_follow_off")}
         </button>
       )}
     </div>

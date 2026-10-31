@@ -62,7 +62,7 @@ import type {
   TrackingLinkResponse,
 } from "@/types";
 import { utcToLocalDisplay, utcToLocalTimeDisplay } from "@/lib/date-utils";
-import { formatDistance } from "@/lib/format";
+import { formatDistance, formatDuration } from "@/lib/format";
 import { haversineKm } from "@/lib/geo";
 
 interface LoadDetailViewProps {
@@ -548,7 +548,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                           </div>
                           <p className="text-sm font-bold tabular-nums">
                             {speedKmh === null ? "—" : (
-                              <>{speedKmh} <span className="text-[10px] font-normal text-muted-foreground">km/h</span></>
+                              <>{speedKmh} <span className="text-[10px] font-normal text-muted-foreground">{t("unit_kmh")}</span></>
                             )}
                           </p>
                         </div>
@@ -568,7 +568,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                           </div>
                           <p className="text-sm font-bold tabular-nums">
                             {position.accuracy_m === null ? "—" : (
-                              <>{Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">m</span></>
+                              <>{Math.round(position.accuracy_m)} <span className="text-[10px] font-normal text-muted-foreground">{t("unit_m")}</span></>
                             )}
                           </p>
                         </div>
@@ -582,9 +582,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
                               ? "—"
                               : etaMinutes < 1
                               ? t("load_detail_eta_soon")
-                              : etaMinutes < 60
-                              ? `~${etaMinutes}m`
-                              : `~${Math.floor(etaMinutes / 60)}h ${etaMinutes % 60}m`}
+                              : `~${formatDuration(etaMinutes, t)}`}
                           </p>
                         </div>
                       </div>
