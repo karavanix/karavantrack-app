@@ -128,18 +128,19 @@ export default function PublicTrackingPage() {
   return (
     <div className="flex h-screen flex-col">
       <header className="shrink-0 border-b px-4 py-3 lg:px-6">
-        <div className="flex items-center gap-3">
+        {/* On a phone the badges take a second row, so the title isn't squeezed to "Цеме…" */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Truck size={18} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <img src="/logo.svg" alt="Yool" className="h-4 w-4" />
               <span className="text-xs font-semibold text-muted-foreground">Yool</span>
             </div>
             <h1 className="truncate text-base font-bold tracking-tight">{load.title}</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 whitespace-nowrap lg:ml-auto lg:w-auto">
             <StatusBadge status={load.status} />
             {isTrackable && <ConnectionStatusBadge status={data.connection ?? null} />}
             {load.reference_id && (
@@ -150,7 +151,7 @@ export default function PublicTrackingPage() {
       </header>
 
       <div className="flex flex-1 flex-col lg:flex-row min-h-0">
-        <div className="h-[320px] lg:h-auto lg:flex-1 border-b lg:border-b-0 lg:border-r">
+        <div className="h-[55vh] min-h-[320px] lg:h-auto lg:min-h-0 lg:flex-1 border-b lg:border-b-0 lg:border-r">
           <MapLibreTrackingMap
             className="h-full w-full"
             pickup={pickup}
