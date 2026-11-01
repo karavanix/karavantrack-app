@@ -101,6 +101,15 @@ export interface ApiError {
   details?: unknown;
 }
 
+/** The server's stable error code (`OTP_MISMATCH`, `CARRIER_HAS_ACTIVE_LOAD`, …), if the response carries one. */
+export function getApiErrorCode(error: unknown): string | undefined {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as ApiError | undefined;
+    return data?.code || undefined;
+  }
+  return undefined;
+}
+
 export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as ApiError | undefined;

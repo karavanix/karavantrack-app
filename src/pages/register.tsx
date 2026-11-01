@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth-store";
@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle, ArrowLeft, CheckSquare, Mail, Square } from "lucide-react";
 import { TelegramLoginButton } from "@/components/telegram-login-button";
+import { OtpInput } from "@/components/shared/otp-input";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password";
 
 type Step = "form" | "verify";
 
@@ -29,9 +31,8 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
-  // OTP state
-  const [otpDigits, setOtpDigits] = useState<string[]>(["" ,"", "", "", "", ""]);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // Bumped to clear the code boxes after a wrong code
+  const [otpReset, setOtpReset] = useState(0);
 
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -46,8 +47,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (form.password.length < 6) {
-      setError(t("register_error_password_length"));
+    if (form.password.length < PASSWORD_MIN_LENGTH) {
+      setError(t("register_error_password_length", { count: PASSWORD_MIN_LENGTH }));
       return;
     }
 
@@ -90,62 +91,7 @@ export default function RegisterPage() {
     } catch (err) {
       setError(getApiErrorMessage(err));
       // Clear OTP on error
-      setOtpDigits(["", "", "", "", "", ""]);
-      inputRefs.current[0]?.focus();
-    }
-  };
-
-  // Focus first OTP input on mount
-  useEffect(() => {
-    if (step === "verify") {
-      inputRefs.current[0]?.focus();
-    }
-  }, [step]);
-
-  // OTP input handlers
-  const handleOtpChange = (index: number, value: string) => {
-    // Only allow digits
-    const digit = value.replace(/\D/g, "").slice(-1);
-    const newDigits = [...otpDigits];
-    newDigits[index] = digit;
-    setOtpDigits(newDigits);
-
-    // Auto-advance to next input
-    if (digit && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    // Auto-submit when all 6 digits entered
-    if (digit && index === 5) {
-      const code = newDigits.join("");
-      if (code.length === 6) {
-        handleVerify(code);
-      }
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (pasted.length === 0) return;
-
-    const newDigits = [...otpDigits];
-    for (let i = 0; i < 6; i++) {
-      newDigits[i] = pasted[i] || "";
-    }
-    setOtpDigits(newDigits);
-
-    // Focus last filled input or submit
-    if (pasted.length === 6) {
-      handleVerify(pasted);
-    } else {
-      inputRefs.current[pasted.length]?.focus();
+      setOtpReset((n) => n + 1);
     }
   };
 
@@ -346,23 +292,7 @@ export default function RegisterPage() {
                   </div>
                 )}
 
-                {/* OTP Input */}
-                <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
-                  {otpDigits.map((digit, i) => (
-                    <Input
-                      key={i}
-                      ref={(el) => { inputRefs.current[i] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(i, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                      className="h-13 w-11 text-center text-xl font-semibold"
-                      aria-label={`${t("verify_digit")} ${i + 1}`}
-                    />
-                  ))}
-                </div>
+                <OtpInput onComplete={handleVerify} resetKey={otpReset} disabled={isLoading} />
 
                 {isLoading && (
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -381,7 +311,6 @@ export default function RegisterPage() {
                   onClick={() => {
                     setStep("form");
                     setError("");
-                    setOtpDigits(["", "", "", "", "", ""]);
                   }}
                 >
                   <ArrowLeft size={16} />
