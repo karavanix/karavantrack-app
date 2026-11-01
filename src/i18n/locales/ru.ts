@@ -406,6 +406,8 @@ const ru = {
   duration_hours: "{{h}} ч",
   duration_hours_minutes: "{{h}} ч {{m}} мин",
   distance_km: "{{value}} км",
+  map_loading: "Загрузка карты…",
+  map_failed: "Не удалось загрузить карту",
   kanban_col_new: "Новые",
   kanban_col_assigned: "Назначены",
   kanban_col_pickup: "Погрузка",

@@ -386,6 +386,8 @@ const uz = {
   duration_hours: "{{h}} soat",
   duration_hours_minutes: "{{h}} soat {{m}} daq",
   distance_km: "{{value}} km",
+  map_loading: "Xarita yuklanmoqda…",
+  map_failed: "Xaritani yuklab bo'lmadi",
   kanban_col_new: "Yangi",
   kanban_col_assigned: "Tayinlangan",
   kanban_col_pickup: "Yuklash",
