@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api } from "@/lib/api";
+import i18n from "@/i18n";
+import { useLocaleStore } from "@/stores/locale-store";
 import type {
   User,
   LoginRequest,
@@ -60,8 +62,9 @@ export const useAuthStore = create<AuthState>()(
       register: async (req) => {
         set({ isLoading: true });
         try {
-          // Register now just sends the OTP email — no tokens returned
-          await api.post("/auth/register", req);
+          // Register now just sends the OTP email — no tokens returned.
+          // `language` is the interface's language: the account starts in it.
+          await api.post("/auth/register", { ...req, language: i18n.language });
         } finally {
           set({ isLoading: false });
         }
@@ -87,12 +90,16 @@ export const useAuthStore = create<AuthState>()(
       fetchMe: async () => {
         const { data } = await api.get<User>("/users/me");
         set({ user: data });
+        useLocaleStore.getState().syncWithUser(data);
       },
 
       telegramSignIn: async (req) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post<TelegramSignInResponse>("/auth/telegram/callback", req);
+          const { data } = await api.post<TelegramSignInResponse>("/auth/telegram/callback", {
+            ...req,
+            language: i18n.language,
+          });
           set({
             accessToken: data.access_token,
             refreshToken: data.refresh_token,

@@ -12,6 +12,8 @@ export interface RegisterRequest {
   last_name?: string;
   password: string;
   role: "shipper" | "carrier";
+  /** The interface's language (ru|uz|en); the store fills it in. */
+  language?: string;
 }
 
 export interface AuthTokens {
@@ -24,6 +26,7 @@ export interface TelegramSignInRequest {
   code: string;
   redirect_uri: string;
   role?: "shipper" | "carrier";
+  language?: string;
 }
 
 export interface TelegramSignInResponse extends AuthTokens {
@@ -50,12 +53,16 @@ export interface User {
   last_name: string;
   role: string;
   status: string;
+  /** ru | uz | en — pushes and emails will follow it. */
+  language?: string;
   created_at: string;
 }
 
 export interface UpdateUserRequest {
   first_name?: string;
   last_name?: string;
+  /** Empty or absent = unchanged. */
+  language?: string;
 }
 
 // ──── Permissions ────

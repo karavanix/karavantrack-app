@@ -9,7 +9,7 @@ import { wsClient } from "@/lib/ws-client";
 
 export function AppLayout() {
   const navigate = useNavigate();
-  const { isAuthenticated, fetchMe, user } = useAuthStore();
+  const { isAuthenticated, fetchMe } = useAuthStore();
   const { fetchCompanies } = useCompanyStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initializing, setInitializing] = useState(true);
@@ -22,9 +22,8 @@ export function AppLayout() {
 
     const init = async () => {
       try {
-        if (!user) {
-          await fetchMe();
-        }
+        // Always: the cached profile may be stale (language, name changed on another device)
+        await fetchMe();
         await fetchCompanies();
       } catch {
         // Token may be invalid

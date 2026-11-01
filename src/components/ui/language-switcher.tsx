@@ -10,9 +10,9 @@ import {
 import { Globe } from "lucide-react";
 
 const LOCALES = [
-  { code: "en" as const, label: "EN — English" },
   { code: "ru" as const, label: "RU — Русский" },
   { code: "uz" as const, label: "UZ — O'zbekcha" },
+  { code: "en" as const, label: "EN — English" },
 ];
 
 export function LanguageSwitcher() {
