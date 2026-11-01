@@ -406,6 +406,8 @@ const en = {
   duration_hours: "{{h}} h",
   duration_hours_minutes: "{{h}} h {{m}} min",
   distance_km: "{{value}} km",
+  map_loading: "Loading map…",
+  map_failed: "Map failed to load",
   kanban_col_new: "New",
   kanban_col_assigned: "Assigned",
   kanban_col_pickup: "Pickup",

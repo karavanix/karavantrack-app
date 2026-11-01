@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * Overlay shown on top of the map container while loading or when an error occurs.
  */
@@ -8,6 +10,7 @@ export function MapOverlay({
   isReady: boolean;
   error: string | null;
 }) {
+  const { t } = useTranslation();
   if (isReady && !error) return null;
 
   return (
@@ -30,7 +33,7 @@ export function MapOverlay({
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
           <p className="text-sm font-medium text-destructive">
-            Map failed to load
+            {t("map_failed")}
           </p>
           <p className="text-xs text-muted-foreground max-w-[240px] truncate">
             {error}
@@ -43,7 +46,7 @@ export function MapOverlay({
             <div className="absolute inset-0 rounded-full border-2 border-t-primary animate-spin" />
           </div>
           <p className="text-xs text-muted-foreground font-medium">
-            Loading map…
+            {t("map_loading")}
           </p>
         </div>
       )}
