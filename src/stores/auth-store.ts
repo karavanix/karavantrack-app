@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api } from "@/lib/api";
+import { track } from "@/lib/analytics";
+import { clearAttribution, currentAttribution } from "@/lib/attribution";
 import type {
   User,
   LoginRequest,
@@ -52,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
           });
           // Fetch user profile after login
           await get().fetchMe();
+          track("login", { method: "email" });
         } finally {
           set({ isLoading: false });
         }
@@ -60,8 +63,11 @@ export const useAuthStore = create<AuthState>()(
       register: async (req) => {
         set({ isLoading: true });
         try {
-          // Register now just sends the OTP email — no tokens returned
-          await api.post("/auth/register", req);
+          // Register now just sends the OTP email — no tokens returned.
+          // `attribution` is where the visitor came from (utm marks of the landing); absent → the
+          // server records `direct`.
+          await api.post("/auth/register", { ...req, attribution: currentAttribution() });
+          track("sign_up_start");
         } finally {
           set({ isLoading: false });
         }
@@ -79,6 +85,8 @@ export const useAuthStore = create<AuthState>()(
             refreshToken: data.refresh_token,
           });
           await get().fetchMe();
+          clearAttribution();
+          track("sign_up", { method: "email" });
         } finally {
           set({ isLoading: false });
         }
@@ -92,12 +100,21 @@ export const useAuthStore = create<AuthState>()(
       telegramSignIn: async (req) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post<TelegramSignInResponse>("/auth/telegram/callback", req);
+          const { data } = await api.post<TelegramSignInResponse>("/auth/telegram/callback", {
+            ...req,
+            attribution: currentAttribution(),
+          });
           set({
             accessToken: data.access_token,
             refreshToken: data.refresh_token,
           });
           await get().fetchMe();
+          if (data.is_new_user) {
+            clearAttribution();
+            track("sign_up", { method: "telegram" });
+          } else {
+            track("login", { method: "telegram" });
+          }
         } finally {
           set({ isLoading: false });
         }

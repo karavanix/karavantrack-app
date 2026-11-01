@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useLoadPositionWS } from "@/hooks/use-load-position-ws";
 import { useLoadTrack } from "@/hooks/use-load-track";
 import { useConnectionStatus } from "@/hooks/use-connection-status";
@@ -252,6 +253,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
     setAssignLoading(true);
     try {
       await api.post(`/loads/${loadId}/assign`, { carrier_id: selectedCarrierId });
+      track("driver_invited", { how: "assign" });
       setAssignOpen(false);
       setSelectedCarrierId("");
       await fetchLoad();
@@ -724,6 +726,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
               <CopyLinkPanel
                 description={t("load_detail_invite_link_desc")}
                 generateLabel={t("load_detail_generate_invite_link")}
+                onCopy={() => track("driver_invited", { how: "link" })}
                 onGenerate={async () => {
                   const { data } = await api.post<InviteLinkResponse>(
                     `/loads/${loadId}/invite-link`
@@ -773,6 +776,7 @@ export function LoadDetailView({ loadId, isModal, onClose, autoOpenAssign }: Loa
               const { data } = await api.post<TrackingLinkResponse>(
                 `/loads/${loadId}/tracking-link`
               );
+              track("tracking_link_created");
               return { url: data.url };
             }}
           />

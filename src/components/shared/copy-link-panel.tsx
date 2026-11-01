@@ -21,6 +21,8 @@ interface CopyLinkPanelProps {
   /** Label for the button shown once a link already exists, to make a new one. */
   regenerateLabel?: string;
   onGenerate: () => Promise<CopyLinkResult>;
+  /** Called once the link is in the clipboard (e.g. to report a goal). */
+  onCopy?: () => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function CopyLinkPanel({
   generateLabel,
   regenerateLabel,
   onGenerate,
+  onCopy,
 }: CopyLinkPanelProps) {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
@@ -59,6 +62,7 @@ export function CopyLinkPanel({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      onCopy?.();
       toast.success(t("copy_link_copied"));
       setTimeout(() => setCopied(false), 2000);
     } catch {

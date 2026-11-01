@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { reverseGeocode, formatPhotonFeature } from "@/lib/geocoding";
 import {
   Dialog,
@@ -238,6 +239,7 @@ export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadMod
         dropoff_at: localToUtc(form.dropoff_at),
       });
       setCreatedLoadId(data.id);
+      track("load_created");
       setStep("assign");
       onSuccess();
     } catch (err) {
@@ -253,6 +255,7 @@ export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadMod
     setAssignLoading(true);
     try {
       await api.post(`/loads/${createdLoadId}/assign`, { carrier_id: selectedCarrierId });
+      track("driver_invited", { how: "assign" });
       onOpenChange(false);
       onSuccess();
     } catch (err) {
@@ -524,6 +527,7 @@ export function CreateLoadModal({ open, onOpenChange, onSuccess }: CreateLoadMod
               <CopyLinkPanel
                 description={t("load_detail_invite_link_desc")}
                 generateLabel={t("load_detail_generate_invite_link")}
+                onCopy={() => track("driver_invited", { how: "link" })}
                 onGenerate={async () => {
                   const { data } = await api.post<InviteLinkResponse>(
                     `/loads/${createdLoadId}/invite-link`
