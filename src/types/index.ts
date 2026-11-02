@@ -1,3 +1,5 @@
+import type { Attribution } from "@/lib/attribution";
+
 // ──── Auth ────
 export interface LoginRequest {
   email?: string;
@@ -12,6 +14,8 @@ export interface RegisterRequest {
   last_name?: string;
   password: string;
   role: "shipper" | "carrier";
+  /** Where the visitor came from (`lib/attribution.ts`); the store fills it in. */
+  attribution?: Attribution;
 }
 
 export interface AuthTokens {
@@ -24,6 +28,7 @@ export interface TelegramSignInRequest {
   code: string;
   redirect_uri: string;
   role?: "shipper" | "carrier";
+  attribution?: Attribution;
 }
 
 export interface TelegramSignInResponse extends AuthTokens {

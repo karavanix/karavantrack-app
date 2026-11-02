@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCompanyStore } from "@/stores/company-store";
 import { getApiErrorMessage } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,7 @@ export default function CreateCompanyPage() {
     setIsLoading(true);
     try {
       await createCompany({ name: name.trim() });
+      track("company_created");
       navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err));
