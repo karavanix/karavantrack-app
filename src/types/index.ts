@@ -55,12 +55,16 @@ export interface User {
   last_name: string;
   role: string;
   status: string;
+  /** ru | uz | en — pushes and emails will follow it. */
+  language?: string;
   created_at: string;
 }
 
 export interface UpdateUserRequest {
   first_name?: string;
   last_name?: string;
+  /** Empty or absent = unchanged. */
+  language?: string;
 }
 
 // ──── Permissions ────

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api } from "@/lib/api";
+import i18n from "@/i18n";
+import { useLocaleStore } from "@/stores/locale-store";
 import { track } from "@/lib/analytics";
 import { clearAttribution, currentAttribution } from "@/lib/attribution";
 import type {
@@ -95,6 +97,7 @@ export const useAuthStore = create<AuthState>()(
       fetchMe: async () => {
         const { data } = await api.get<User>("/users/me");
         set({ user: data });
+        useLocaleStore.getState().syncWithUser(data);
       },
 
       telegramSignIn: async (req) => {
