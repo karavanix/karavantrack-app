@@ -19,8 +19,13 @@ export function OtpInput({ onComplete, resetKey = 0, disabled }: OtpInputProps) 
   const [digits, setDigits] = useState<string[]>(empty);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
-  useEffect(() => {
+  // A new resetKey clears the boxes during render (no extra effect pass), then focuses the first one.
+  const [seenKey, setSeenKey] = useState(resetKey);
+  if (resetKey !== seenKey) {
+    setSeenKey(resetKey);
     setDigits(empty());
+  }
+  useEffect(() => {
     refs.current[0]?.focus();
   }, [resetKey]);
 

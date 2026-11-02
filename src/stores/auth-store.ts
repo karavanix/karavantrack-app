@@ -66,9 +66,14 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           // Register now just sends the OTP email — no tokens returned.
+          // `language` is the interface's language: the account starts in it.
           // `attribution` is where the visitor came from (utm marks of the landing); absent → the
           // server records `direct`.
-          await api.post("/auth/register", { ...req, attribution: currentAttribution() });
+          await api.post("/auth/register", {
+            ...req,
+            language: i18n.language,
+            attribution: currentAttribution(),
+          });
           track("sign_up_start");
         } finally {
           set({ isLoading: false });
@@ -105,6 +110,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data } = await api.post<TelegramSignInResponse>("/auth/telegram/callback", {
             ...req,
+            language: i18n.language,
             attribution: currentAttribution(),
           });
           set({

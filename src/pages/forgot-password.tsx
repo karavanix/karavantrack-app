@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AlertCircle, ArrowLeft, KeyRound, Mail } from "lucide-react";
 import { api, getApiErrorCode, getApiErrorMessage } from "@/lib/api";
 import { PASSWORD_MIN_LENGTH } from "@/lib/password";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -96,6 +97,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     try {
       await api.post("/auth/password/reset", { email: email.trim(), code, new_password: password });
+      track("password_reset");
       toast.success(t("forgot_success"));
       navigate("/login", { replace: true });
     } catch (err) {
