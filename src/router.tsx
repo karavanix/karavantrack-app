@@ -1,4 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { captureAttribution } from "@/lib/attribution";
+import { loadCounterScripts, pageView } from "@/lib/analytics";
 import { AppLayout } from "@/components/layout/app-layout";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
@@ -16,9 +19,35 @@ import DeleteAccountPage from "@/pages/delete-account";
 import InvitePage from "@/pages/invite";
 import PublicTrackingPage from "@/pages/public-tracking";
 
+/**
+ * Counters and the visit's source. On mount: remembers the utm marks of the address (sent later
+ * with the registration) and schedules the counters' scripts for after `load`. On every route
+ * change: one page view to both counters, with the URL cleaned of tokens (see `publicPath`).
+ */
+function Analytics() {
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    captureAttribution();
+    if (document.readyState === "complete") {
+      loadCounterScripts();
+      return;
+    }
+    window.addEventListener("load", loadCounterScripts, { once: true });
+    return () => window.removeEventListener("load", loadCounterScripts);
+  }, []);
+
+  useEffect(() => {
+    pageView(pathname, search);
+  }, [pathname, search]);
+
+  return null;
+}
+
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <Analytics />
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
