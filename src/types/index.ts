@@ -14,6 +14,8 @@ export interface RegisterRequest {
   last_name?: string;
   password: string;
   role: "shipper" | "carrier";
+  /** The interface's language (ru|uz|en); the store fills it in. */
+  language?: string;
   /** Where the visitor came from (`lib/attribution.ts`); the store fills it in. */
   attribution?: Attribution;
 }
@@ -28,6 +30,7 @@ export interface TelegramSignInRequest {
   code: string;
   redirect_uri: string;
   role?: "shipper" | "carrier";
+  language?: string;
   attribution?: Attribution;
 }
 
