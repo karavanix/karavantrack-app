@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Spinner } from "@/components/ui/spinner";
 import { OtpInput } from "@/components/shared/otp-input";
 
-type Step = "email" | "reset";
+type Step = "email" | "code" | "password";
 
 /** The server's OTP codes → our texts; anything else falls back to the server's message. */
 const OTP_ERROR_KEYS: Record<string, string> = {
@@ -23,10 +23,12 @@ const OTP_ERROR_KEYS: Record<string, string> = {
 };
 
 /**
- * Password reset: email → the code from the email + a new password. `POST /auth/password/forgot`
- * always answers 200 (one cannot tell from it whether the email exists; a repeat within a minute
- * sends no new code); `POST /auth/password/reset` returns no tokens and signs the person out
- * everywhere, so after success it is back to the login page.
+ * Password reset in three steps: email → the code from the email → a new password.
+ * `POST /auth/password/forgot` always answers 200 (one cannot tell from it whether the email
+ * exists; a repeat within a minute sends no new code). The code is checked only together with the
+ * password by `POST /auth/password/reset`, so a wrong code comes back from the last step to the
+ * code step. The reset returns no tokens and signs the person out everywhere: after success it is
+ * back to the login page.
  */
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -51,7 +53,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     try {
       await requestCode();
-      setStep("reset");
+      setStep("code");
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -74,13 +76,15 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  const handleCode = (value: string) => {
+    setCode(value);
+    setError("");
+    setStep("password");
+  };
+
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (code.length !== 6) {
-      setError(t("forgot_error_code"));
-      return;
-    }
     if (password.length < PASSWORD_MIN_LENGTH) {
       setError(t("register_error_password_length", { count: PASSWORD_MIN_LENGTH }));
       return;
@@ -98,8 +102,10 @@ export default function ForgotPasswordPage() {
       const key = OTP_ERROR_KEYS[getApiErrorCode(err) ?? ""];
       setError(key ? t(key) : getApiErrorMessage(err));
       if (key) {
+        // The code was the problem: back to it, with empty boxes
         setCode("");
         setOtpReset((n) => n + 1);
+        setStep("code");
       }
     } finally {
       setLoading(false);
@@ -124,15 +130,21 @@ export default function ForgotPasswordPage() {
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center">
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-              {step === "email" ? (
-                <KeyRound size={24} className="text-primary" />
-              ) : (
+              {step === "code" ? (
                 <Mail size={24} className="text-primary" />
+              ) : (
+                <KeyRound size={24} className="text-primary" />
               )}
             </div>
-            <CardTitle>{step === "email" ? t("forgot_title") : t("forgot_code_sent_title")}</CardTitle>
+            <CardTitle>
+              {step === "email" && t("forgot_title")}
+              {step === "code" && t("forgot_code_sent_title")}
+              {step === "password" && t("forgot_new_password_title")}
+            </CardTitle>
             <CardDescription>
-              {step === "email" ? t("forgot_subtitle") : t("forgot_code_sent_subtitle", { email: email.trim() })}
+              {step === "email" && t("forgot_subtitle")}
+              {step === "code" && t("forgot_code_sent_subtitle", { email: email.trim() })}
+              {step === "password" && t("forgot_new_password_subtitle", { count: PASSWORD_MIN_LENGTH })}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -177,8 +189,8 @@ export default function ForgotPasswordPage() {
                   </Link>
                 </p>
               </form>
-            ) : (
-              <form onSubmit={handleReset} className="space-y-5">
+            ) : step === "code" ? (
+              <div className="space-y-5">
                 {error && (
                   <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
                     <AlertCircle size={16} className="shrink-0" />
@@ -188,8 +200,46 @@ export default function ForgotPasswordPage() {
 
                 <div className="space-y-2">
                   <Label className="block text-center">{t("forgot_code")}</Label>
-                  <OtpInput onComplete={setCode} resetKey={otpReset} disabled={loading} />
+                  <OtpInput onComplete={handleCode} resetKey={otpReset} disabled={resending} />
                 </div>
+
+                <div className="space-y-1 text-center text-xs text-muted-foreground">
+                  <p>{t("verify_hint_short")}</p>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-xs"
+                    onClick={handleResend}
+                    disabled={resending}
+                  >
+                    {resending && <Spinner size={12} />}
+                    {t("forgot_resend")}
+                  </Button>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setStep("email");
+                    setError("");
+                    setCode("");
+                  }}
+                >
+                  <ArrowLeft size={16} />
+                  {t("forgot_change_email")}
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleReset} className="space-y-4">
+                {error && (
+                  <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                    <AlertCircle size={16} className="shrink-0" />
+                    {error}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="new-password">{t("forgot_new_password")}</Label>
@@ -202,6 +252,7 @@ export default function ForgotPasswordPage() {
                     required
                     minLength={PASSWORD_MIN_LENGTH}
                     autoComplete="new-password"
+                    autoFocus
                   />
                 </div>
 
@@ -229,33 +280,20 @@ export default function ForgotPasswordPage() {
                   )}
                 </Button>
 
-                <div className="space-y-1 text-center text-xs text-muted-foreground">
-                  <p>{t("verify_hint_short")}</p>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-xs"
-                    onClick={handleResend}
-                    disabled={resending || loading}
-                  >
-                    {resending && <Spinner size={12} />}
-                    {t("forgot_resend")}
-                  </Button>
-                </div>
-
                 <Button
                   type="button"
                   variant="ghost"
                   className="w-full"
+                  disabled={loading}
                   onClick={() => {
-                    setStep("email");
+                    setStep("code");
                     setError("");
                     setCode("");
+                    setOtpReset((n) => n + 1);
                   }}
                 >
                   <ArrowLeft size={16} />
-                  {t("forgot_change_email")}
+                  {t("forgot_back_to_code")}
                 </Button>
               </form>
             )}
